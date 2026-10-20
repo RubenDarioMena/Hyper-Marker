@@ -1,49 +1,46 @@
-# Seguridad y límites de confianza
+# Seguridad y límites de confianza V1
 
-Diseño y criterios pendientes de implementación. Esta guía desarrolla las secciones 1, 5 y 9 de la [especificación](../Interactive_Notes_Android_Agent_Design.md); no constituye una auditoría ni una garantía de sandbox perfecto.
+Los documentos importados son código no confiable. Esta guía describe defensas implementadas; resultados en [validation.md](validation.md). WebView no se considera un sandbox perfecto ni un firewall del sistema.
 
-## Activos y entradas no confiables
+## Archivos e importación
 
-Proteger originales, Markdown, anotaciones, otros documentos de la biblioteca y datos privados de Android. Considerar no confiables archivos/URIs recibidos, proveedores externos, entradas ZIP, nombres/rutas, HTML/CSS/JS, mensajes del controlador, texto Markdown y destinos de navegación. Un documento puede intentar leer otro, agotar recursos, suplantar eventos o provocar accesos remotos.
+- SAF/Compartir se copian a almacenamiento privado antes de publicar el documento. No se depende de acceso indefinido a un URI temporal.
+- `PathGuard` rechaza rutas vacías/absolutas, traversal, componentes `.`/`..`, separadores alternativos, NUL y nombres ambiguos con `%` o `:`. Se valida pertenencia canónica a la raíz, no sólo prefijos de texto.
+- ZIP rechaza symlinks, entradas Unix especiales, colisiones incluso por mayúsculas/minúsculas, formatos no legibles y CRC incorrecto. Se cuentan bytes reales y se preservan rutas relativas.
+- Límites de importación: 10.000 entradas, 100 MiB por archivo, 500 MiB totales, hasta 64 componentes, ratio ZIP 200:1. El ZIP comprimido de entrada también está limitado. Los tests inyectan presupuestos pequeños.
+- Copias/cancelaciones/fallos usan staging y compensación. Al iniciar el proceso se limpian operaciones incompletas y directorios sin metadatos. La biblioteca no publica imports parciales.
+- Los originales quedan separados y el código de anotación nunca escribe dentro de ellos. Duplicar crea identidades/archivos nuevos. Borrar requiere confirmación y limpia descendientes.
 
-## Importación
+## Origen, CSP y canales de red
 
-- Copiar al almacenamiento privado antes de publicar en la biblioteca. Gestionar permisos SAF sólo durante el tiempo necesario; no depender de URIs temporales de Compartir.
-- Normalizar nombres y rutas antes de escribir. Rechazar rutas absolutas, traversal, separadores alternativos peligrosos, bytes nulos, enlaces simbólicos y colisiones de destino. Propuesta conservadora: rechazar todos los symlinks del import, aunque algunos pudieran permanecer dentro de la raíz.
-- Comprobar que cada destino resuelto queda dentro de la raíz canónica de staging. No usar una simple comparación de prefijos que confunda directorios hermanos. No sobrescribir archivos ya extraídos; detectar colisiones tras normalización.
-- Contar bytes realmente leídos/descomprimidos, no confiar en tamaños declarados. No extraer ZIP anidados automáticamente. Aplicar los mismos límites al copiar árboles SAF.
-- Propuesta inicial ajustable: 10.000 archivos, 100 MiB por archivo, 500 MiB totales, 64 componentes de profundidad y relación de compresión ZIP máxima 200:1. Validar estas cifras con fixtures/dispositivos; documentar cualquier cambio. Límites no sustituyen cancelación, control de espacio libre ni protección de memoria.
-- Mostrar error claro, permitir cancelar, limpiar staging y recuperar operaciones interrumpidas. Una entrada inválida rechaza la operación completa; no producir una importación aparentemente exitosa con archivos omitidos silenciosamente.
+Cada documento tiene un host virtual propio y sólo su instancia de AssetLoader puede servir su raíz privada. No se sirven Room, staging, otros documentos ni archivos del sistema. `file://`, `content://`, acceso universal, popups, permisos web, cookies y descargas están deshabilitados.
 
-## Acceso local y origen
+Las respuestas del proyecto aplican CSP con **`sandbox allow-scripts` sin `allow-same-origin`**. El contenido se ejecuta con origen opaco: no puede recuperar APIs de una ventana hija vacía del mismo origen. Esta defensa se añadió después de comprobar que bloquear Fetch/WebSocket no basta para impedir un paquete STUN de WebRTC mediante un iframe vacío.
 
-- Servir sólo el documento activo mediante HTTPS virtual controlado. Validar también rutas de solicitudes web, incluyendo rutas codificadas, separadores y decodificación consistente; una ruta rechazada no debe caer al filesystem ni a red como fallback.
-- No servir la base Room, Markdown de otros documentos, staging, archivos del sistema ni carpetas superiores. MIME correcto para recursos; entrada inexistente genera error visible, no acceso ampliado.
-- Deshabilitar acceso irrestricto `file://`, acceso universal desde file URLs y esquemas peligrosos. No exponer `content://` a páginas como vía indirecta de lectura.
-- Validar aislamiento entre documentos para cookies, DOM storage, cache y service workers. Usar una ruta diferente bajo el mismo host no constituye aislamiento de origen. Si no se puede ofrecer persistencia web aislada, optar por una política más restrictiva y documentar el efecto en compatibilidad.
+Se instala un bootstrap antes de scripts importados usando `DOCUMENT_START_SCRIPT`: deshabilita PeerConnection/WebTransport/Worker/SharedWorker. Se aplica a todos los frames del visor, sin concederles privilegios nativos. Workers y service workers también están bloqueados por CSP/configuración nativa. Si el proveedor no soporta el bootstrap temprano, el lector deshabilita JavaScript e informa que debe actualizarse WebView.
 
-## Política de red y capacidades web
+OFFLINE es el valor inicial. Se combinan `blockNetworkLoads`, intercepción de solicitudes, CSP y bootstrap. `connect-src` permite exclusivamente la URL privada del proyecto para que `fetch('datos.json')` funcione; recursos remotos, sockets y canales deshabilitados se rechazan. Las respuestas locales llevan CORS para que módulos ES y fetch funcionen desde el origen opaco. Ese encabezado no abre otros proyectos: el handler sólo autoriza el documento activo.
 
-`trustPolicy` propuesta: `OFFLINE` por defecto y `NETWORK_ALLOWED` sólo tras acción del usuario para ese documento. Duplicados/importaciones nuevas vuelven a OFFLINE como valor seguro. Permitir red no concede micrófono, cámara, ubicación, archivos, downloads automáticos ni interfaces nativas.
+El permiso por documento permite recursos HTTPS/WSS y recrea WebView al cambiar/revocar, cerrando el anterior. No permite HTTP claro, navegación principal externa, cámara/micrófono, workers, WebRTC, descargas ni acceso a otras notas. El permiso Android `INTERNET` del manifiesto es necesario para la opción online, pero no implementa por sí solo la política.
 
-En H3 implementar y verificar controles para navegación principal, recursos secundarios, iframes, fetch/XHR, WebSockets, service workers, redirecciones y solicitudes tras cambiar de documento. Un solo callback de intercepción no debe asumirse suficiente. El proveedor local debe seguir funcionando offline. Rechazar contenido mixto y definir esquemas permitidos; abrir destinos externos sólo con acción explícita. No cargar páginas externas privilegiadas dentro de un contexto con bridge activo.
+La cobertura concreta incluye sockets TCP/UDP locales de prueba, Fetch, WebSocket, workers y acceso entre documentos en los proveedores probados. No equivale a auditar todos los canales de todas las versiones de WebView; mantener estas regresiones al actualizar dependencias/proveedor.
 
-Al revocar permiso de red, detener/recargar o recrear el viewer según sea necesario para cortar conexiones activas; comprobar que no siguen canales abiertos. Registrar cualquier canal no controlable y resolverlo antes de afirmar que el modo offline bloquea solicitudes de red. El permiso Android `INTERNET`, si se declara para la función opt-in, no implementa por sí mismo la autorización por documento.
+## Compatibilidad del almacenamiento web
 
-## Bridge y anotaciones
+El origen opaco impide cookies, IndexedDB y DOM storage nativo. Se emulan APIs comunes de `localStorage` y `sessionStorage` en memoria para permitir interactividad durante una sesión. Esos valores no se restauran al recrear/cerrar el visor. Las páginas que dependan de almacenamiento web persistente o comunicación directa entre frames tienen esta limitación explícita; no se oculta tras el permiso de red.
 
-- Usar contrato versionado, frame/origen autorizados, documento/revisión/sesión activa, tipos conocidos, límites de frecuencia/tamaño y validación estricta de campos. Rechazar números no finitos y referencias ajenas.
-- No exponer acceso general al filesystem, procesos, intents, credenciales ni lectura/escritura arbitraria de Room. No implementar JS eval remoto como parte de la consola V1.
-- La página puede compartir contexto con el controlador inyectado. Tratar sus mensajes como datos no confiables incluso con origen correcto. Los identificadores de sesión no son secretos frente a esa página.
-- El modo nativo limita qué eventos acepta la app; un mensaje aislado no crea un pin sin editor/guardado. Validar pertenencia de las anotaciones y requerir confirmación para operaciones destructivas previstas por producto.
-- Renderizar títulos/cuerpos como texto o Markdown sanitizado, sin interpolación en scripts/HTML. Un pin nunca modifica el original. Limitar buffers de consola y evitar registrar contenido privado innecesariamente.
+Markdown, pines, trazos y preferencias se guardan en almacenamiento nativo privado. `AtomicFile` protege el Markdown; Room guarda metadatos y anotaciones. Backups automáticos y transferencia de datos están deshabilitados en el manifiesto/reglas de extracción; exportar/backup es una función posterior.
 
-## Disponibilidad y privacidad
+## Bridge
 
-Limitar memoria de importación, consola y geometría; agrupar observadores DOM y cancelar trabajos al salir. Una caída de renderer no debe destruir datos persistidos. Definir política de backup Android explícita en H1/H7: propuesta conservadora sin copia automática de documentos personales hasta diseñar y verificar backup/restauración. No introducir analítica ni transferencia de documentos como requisito implícito.
+El editor confiable usa origen exacto. El lector aislado necesita transporte de mensajes con regla `*` porque su origen es opaco; la autorización real exige **frame principal + URL HTTPS privada del documento activo + sesión/revisión + modo + contrato validado**. Los subframes no pueden usar el bridge para acciones nativas. Navegaciones completas renuevan sesión; eventos tardíos o de otra página se descartan.
 
-Usar fixtures sintéticos, nunca archivos personales, para pruebas maliciosas. No incluir tokens, claves de firma, contraseñas, SDK locales ni contenido de usuario en commits.
+La página comparte contexto con el controlador: una sesión no es un secreto frente a ella. Por ello los mensajes siguen siendo no confiables. No existe `addJavascriptInterface`, eval nativo expuesto, lectura arbitraria de archivos, ejecución de procesos, intents ni concesión de permisos. Guardar pines requiere editor nativo y contenido significativo.
 
-## Riesgos residuales que deben comunicarse
+`BridgeValidator` limita tipos, tamaño, frecuencia, IDs de petición y coordenadas finitas. El repositorio verifica pertenencia, cantidad, tamaño agregado y tipos de anotación. Títulos/Markdown viajan como JSON y se presentan como texto o mediante un editor controlado; no se interpolan como scripts. Fuente Markdown con HTML/extensiones no preservables permanece en Source.
 
-HTML puede alterar su DOM, ocultar elementos, consumir recursos o interferir con overlays dentro del WebView. El anclaje puede fallar en páginas dinámicas/iframes y los dibujos pueden desalinearse por reflujo. WebView depende de la versión instalada del sistema; documentar Android/WebView probados. Las páginas que requieran servicios remotos o APIs web no compatibles pueden quedar incompletas. Ningún documento debe presentarse como perfectamente aislado sin pruebas que sustenten el alcance concreto de esa afirmación.
+## Disponibilidad y riesgos residuales
+
+Consola limitada a 300 entradas, imports por streaming, recálculos DOM agrupados, persistencia por trazo/operación e historial de edición acotado. Una caída del renderer no elimina originales ni notas guardadas. Errores de guardado dejan estado pendiente y permiten reintentar.
+
+HTML puede consumir recursos, cambiar su DOM o interferir visualmente con overlays. No se garantiza identidad semántica de objetos canvas, recuperación de DOM arbitrariamente cambiante ni alineación de dibujos después del reflujo. El aislamiento y las APIs web dependen del proveedor instalado. Los límites se prueban con contenido sintético; no se prometen privilegios o compatibilidad que no hayan sido verificados.

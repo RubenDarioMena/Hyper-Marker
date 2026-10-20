@@ -23,3 +23,8 @@ captures/
 node_modules/
 __pycache__/
 *.pyc
+
+# Evidencia local y reportes regenerables
+/artifacts/
+/web/test-results/
+/web/playwright-report/

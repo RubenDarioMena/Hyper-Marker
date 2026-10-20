@@ -1,161 +1,123 @@
-# Arquitectura de Hyper-Marker
+# Arquitectura de Hyper-Marker V1
 
-Estado: diseño de arranque, sin implementación. Basado en las secciones 5–7 de la [especificación](Interactive_Notes_Android_Agent_Design.md). Las decisiones marcadas **propuesta** se validan en el hito correspondiente y se registran en `progress.md`.
+Estado: implementación nativa en un módulo Gradle `app`. Esta guía describe el código actual; la [especificación original](Interactive_Notes_Android_Agent_Design.md) gobierna el alcance funcional. Versiones en [docs/dependencies.md](docs/dependencies.md); resultados en [docs/validation.md](docs/validation.md).
 
-## 1. Límites y responsabilidades
-
-Android nativo con Kotlin, Compose, Room y WebView. Se propone un único módulo Gradle `app` con paquetes por responsabilidad; los nombres siguientes describen responsabilidades, no archivos existentes:
+## Responsabilidades
 
 ```text
-app/src/main/java/<namespace>/
-  library/       Biblioteca, búsqueda, navegación, acciones e importación
-  viewer/        Host WebView, historial, consola, autoscroll, lifecycle
-  markdown/      Source/Visual, conversión, autosave, historial de edición
-  annotation/    Pines, anclas, trazos, comandos undo/redo, herramientas
-  storage/       Room, repositorios, archivos privados, staging de importación
-  security/      Rutas, origen, política de red, permisos y validación
-  bridge/        Contratos, validación y transporte de mensajes
-app/src/main/assets/annotation/   Controlador JS/CSS de confianza de la app
+app/src/main/java/com/hypermarker/
+  MainActivity.kt           Entrada, intents compartidos y selección de pantalla
+  library/                  Biblioteca Compose, operaciones y licencias
+  storage/                  Room, repositorio y SafeImporter
+  viewer/                   WebView, ReaderViewModel y herramientas
+  markdown/                 Source/Visual, política de round-trip y guardado
+  bridge/                   Validación del protocolo de eventos
+  security/                 Rutas e invariantes de jerarquía
+app/src/main/assets/
+  annotation/controller.js  Hit testing, resaltado, marcadores, SVG y gestos
+  security/                 Bootstrap offline previo a scripts del documento
+  editor/                   Milkdown local compilado desde web/src/
+  licenses/                 Avisos y textos de terceros distribuidos con el APK
 ```
 
-La UI invoca casos de uso; éstos coordinan repositorios y políticas. Los repositorios separan metadatos Room de archivos. El controlador DOM comunica objetivos y geometría; Android decide qué datos persistir y qué acciones están permitidas. Los imports y la E/S no bloquean el hilo principal.
+Se usan Compose, ViewModels y corrutinas. La UI solicita operaciones al repositorio; éste serializa mutaciones en un mutex sobre `Dispatchers.IO` y coordina Room/archivos. El controlador DOM se encarga de geometría y propone eventos; Android valida, muestra editores y decide qué persistir. No hay servidor remoto ni backend.
 
 ```mermaid
 flowchart TD
-  UI[Compose: biblioteca, lector y editores] --> UC[Casos de uso]
-  UC --> DB[Room: metadatos y anotaciones]
-  UC --> FILES[Archivos privados: originales y Markdown]
-  SAF[SAF y Sharesheet] --> IMP[Importador: validar y copiar a staging]
-  IMP --> UC
-  UI --> WV[WebView del documento activo]
-  WV --> POLICY[Política de recursos y red]
-  POLICY --> ASSET[Proveedor HTTPS local controlado]
-  ASSET --> FILES
-  WV <--> JS[Controlador DOM de anotaciones]
-  JS <--> BRIDGE[Mensajes acotados y validados]
-  BRIDGE --> UC
+  UI[Compose: biblioteca y editores] --> VM[ViewModels: estado y comandos]
+  VM --> REPO[LibraryRepository: operaciones serializadas]
+  SAF[SAF / Sharesheet] --> IMP[SafeImporter y staging]
+  IMP --> REPO
+  REPO --> ROOM[Room: biblioteca, anotaciones, preferencias]
+  REPO --> FILES[Archivos privados: originales y Markdown]
+  UI --> WEB[DocumentWebView]
+  WEB --> POLICY[Política de red, navegación y rutas]
+  POLICY --> ASSETS[WebViewAssetLoader: documento activo]
+  ASSETS --> FILES
+  WEB <--> JS[Controlador DOM / SVG]
+  JS --> BRIDGE[BridgeValidator: origen, sesión, modo y payload]
+  BRIDGE --> VM
 ```
 
-## 2. Datos y autoridad
+## Datos y persistencia
 
-Identidades opacas independientes del nombre del archivo; timestamps consistentes; migraciones explícitas de Room y versiones en payloads. La duplicación crea identidades nuevas y copia también los datos asociados sin compartir archivos mutables.
+El esquema Room v1 se exporta en `app/schemas/com.hypermarker.storage.LibraryDatabase/1.json`. No se usa migración destructiva: el próximo cambio de esquema deberá incluir migración explícita.
 
-| Entidad | Campos principales | Invariantes |
+| Entidad real | Datos | Invariantes |
 | --- | --- | --- |
-| Folder | id, parentFolderId?, name, sortOrder, createdAt, updatedAt | Sin ciclos; no mover a sí misma ni a descendientes. Raíz representada por padre nulo. |
-| Document | id, folderId?, type, title, entryPath?, rootKey?, trustPolicy, revision, createdAt, updatedAt | HTML requiere entrada válida dentro de su raíz. MARKDOWN tiene fuente privada. Nombre no es identidad. |
-| MarkdownContent | documentId, sourcePath, revision, updatedAt | Propuesta: archivo `.md` autoritativo; Room almacena referencia y revisión, no una segunda copia editable del texto. |
-| Annotation | id, documentId, kind, schemaVersion, payloadJson, createdAt, updatedAt | PIN o STROKE; datos validados y separados del HTML. |
-| Anchor | id, annotationId, pageKey, strategy, selector?, fingerprint?, relativeX, relativeY, fallbackX?, fallbackY?, status | DOM, SURFACE o PAGE; pertenencia a documento/revisión y página. Estado explícito RESOLVED o UNANCHORED. |
-| ViewerPreference | documentId, zoom?, scrollSpeed?, scrollDirection?, lastPosition? | Preferencias por documento; sin autoscroll inesperado al volver a abrir. |
+| Folder | id, parentId?, name, createdAt | FK de padre con cascada; movimientos sin ciclos ni destinos inexistentes. |
+| Document | id, folderId?, title, type, entryPath?, networkAllowed, revision, createdAt, updatedAt | UUID independiente del nombre; tipo HTML/MARKDOWN; red inicialmente false. |
+| Annotation | id, documentId, kind, pageKey, payload, schemaVersion | PIN/STROKE; FK al documento; payload JSON v1 validado y separado del HTML. |
+| ViewerPreference | documentId, zoom, scrollY, speed, direction, pagePath? | Preferencia por documento, sin reanudar autoscroll por sorpresa. |
 
-El `pageKey` es una extensión propuesta para impedir mostrar anotaciones de una página en otra del mismo proyecto. Debe identificar la ruta interna normalizada; hash/ruta SPA requiere una política verificable en H5. No incluir parámetros o fragmentos a ciegas si sólo representan navegación al mismo contenido.
-
-El payload PIN contiene título y cuerpo Markdown. El payload STROKE contiene herramienta, color, ancho, puntos y sistema de coordenadas con metadatos de escala/superficie. Los tamaños tienen límites. Una relación opcional entre documentos Markdown y HTML puede añadirse sin acoplar sus archivos.
-
-## 3. Archivos y transacciones
-
-Layout propuesto dentro de `filesDir`:
+Las anclas se embeben en el payload PIN; no hay tabla Anchor separada. El Markdown autoritativo reside en un archivo `.md`, no en una segunda copia editable en Room. Esta concreción mantiene el modelo indicativo del diseño sin duplicar autoridades.
 
 ```text
-documents/<documentId>/original/<rutas importadas>
-documents/<documentId>/markdown/source.md
-imports/<operationId>/staging/
+filesDir/documents/<UUID>/original/<rutas del proyecto>
+filesDir/documents/<UUID>/markdown/source.md
+filesDir/imports/<UUID>/original/<contenido en staging>
 ```
 
-`original/` permanece inmutable. `rootKey` es una clave controlada por la app, no una ruta proporcionada por el HTML. El controlador JS de la app se distribuye con el APK y se inyecta en ejecución; no se añade a los originales. Al principio los trazos pueden residir en payloads Room; separar blobs a archivos sólo si sus tamaños lo justifican.
+Importar: copiar → validar → resolver entrada → renombrar staging al destino privado → confirmar Room. Sólo después se publica el documento. Si falla la confirmación se compensan archivos. Al iniciar el proceso, una recuperación serializada limpia staging y directorios no referenciados; no vuelve a ejecutarse sobre importaciones activas del mismo proceso. Un cierre entre rename y commit deja un huérfano limpiable, nunca un documento parcial visible.
 
-Importar mediante una máquina de estados: copiar a staging → validar recursos y límites → resolver entrada → mover al destino privado → confirmar metadatos → publicar en biblioteca. Room y archivos no comparten una transacción: usar un registro de operación o reconciliación equivalente, compensación ante fallo y limpieza recuperable de staging/directorios huérfanos al iniciar. Nunca mostrar un documento parcial como listo.
+Markdown usa `AtomicFile`; los guardados se ordenan por revisión en el ViewModel y se serializan en el repositorio. El archivo es la autoridad si una interrupción ocurre antes de actualizar timestamps/revisión de Room. Autosave tras aproximadamente 500 ms de inactividad, guardado al pausar y guardado explícito antes de salir. Una edición aún no guardada puede perderse por muerte abrupta del proceso.
 
-Markdown se guarda mediante archivo temporal y reemplazo atómico, coordinando su revisión con Room y recuperando discrepancias tras interrupción. Serializar guardados para que una revisión antigua no sobrescriba otra reciente. Definir y probar la ventana de autosave, el guardado al salir y la recuperación tras cierre abrupto; no prometer preservar pulsaciones aún no guardadas.
+Duplicar crea nuevos UUID y copias privadas de archivos/anotaciones; la copia empieza sin permiso de red. Las carpetas y sus descendientes se duplican dentro de una transacción de metadatos con limpieza compensatoria de archivos. Eliminar exige confirmación en UI; Room borra en cascada y la limpieza de archivos puede completarse en el siguiente arranque si se interrumpe.
 
-Eliminación V1: confirmación con alcance visible para carpetas y descendientes; propuesta de operación recuperable hasta terminar la limpieza. Papelera no es obligatoria si existe confirmación. Duplicar/mover debe mantener consistencia ante fallo y evitar ciclos o referencias rotas. Reimportar no implica trasladar anclas automáticamente a una nueva estructura DOM.
+## Importación
 
-## 4. Importación y entrada HTML
+`SafeImporter` acepta streams de SAF/Compartir y árboles `DocumentFile`. ZIP usa Commons Compress para inspeccionar modo Unix y rechazar symlinks/entradas especiales. Se comprueban rutas canónicas, colisiones, bytes reales, cantidad, profundidad, ratio y CRC. Ningún URI temporal queda como única copia.
 
-Aceptar HTML/HTM, árboles SAF y ZIP; recibir URIs de `ACTION_SEND`/`ACTION_SEND_MULTIPLE` cuando corresponda. No confiar únicamente en extensión/MIME ni conservar dependencia de un permiso temporal. Copiar por streams con límites, cancelar y limpiar sin publicar resultados incompletos.
+Preferir `index.html` raíz, luego un index inequívoco en directorio envolvente, luego un HTML único. Ante múltiples candidatos se muestra selector. Un HTML suelto no aporta recursos vecinos automáticamente: importar la carpeta, ZIP o varios recursos compartidos cuando corresponda.
 
-Preferir `index.html` en la raíz seleccionada. Si sólo hay un directorio envolvente, se propone usarlo como raíz cuando no haya ambigüedad. Si existen múltiples candidatos sin entrada inequívoca, mostrar selector. Mantener rutas relativas y errores de recursos faltantes; un archivo HTML suelto no aporta automáticamente sus recursos vecinos.
+Los valores de límites están en `ImportLimits` y [security.md](docs/security.md). Los tests pueden inyectar límites pequeños para no crear archivos enormes.
 
-Los límites propuestos y amenazas de extracción están en [security.md](docs/security.md). Los valores se prueban y ajustan antes de considerar H2 completo.
+## Lector y permisos
 
-## 5. WebView y aislamiento
+Cada documento se sirve desde una URL virtual `https://d<UUID>.hypermarker.invalid`. Un `WebViewAssetLoader` con `PathHandler` sólo abre su raíz `original/`. Rutas locales rechazadas nunca caen a filesystem o red. El editor usa un origen HTTPS propio (`editor.hypermarker.invalid`) y sólo assets del APK.
 
-Servir recursos locales mediante `WebViewAssetLoader` o equivalente HTTPS controlado, con `PathHandler` privado y acceso al documento activo exclusivamente. **Propuesta a validar:** host virtual distinto por documento para reducir colisiones de cookies/storage/orígenes. Un prefijo de ruta por sí solo no aísla orígenes web. Si la API elegida o el perfil WebView impide la separación esperada, registrar la limitación y probar una alternativa antes de entregar H3.
+El lector deshabilita file/content URL access, accesos universales, cookies, popups, geolocalización y permisos web automáticos. La red permanece OFFLINE salvo autorización explícita por documento. Se combinan intercepción nativa, `blockNetworkLoads` y CSP en respuestas locales; un bootstrap offline se instala mediante `DOCUMENT_START_SCRIPT` antes de los scripts importados para restringir canales que no controla CSP por sí sola. Se requiere un proveedor WebView actualizado para JavaScript/anotaciones seguras. Workers y service workers están bloqueados incluso con red permitida.
 
-JavaScript se habilita en el lector del documento. Archivo local, acceso universal desde `file://`, interfaces generales de Android, permisos automáticos, ventanas emergentes y navegación no autorizada permanecen deshabilitados. Los detalles de red, subframes, WebSockets, workers y canales que no cubra la intercepción ordinaria son un criterio de implementación y prueba, no una garantía asumida. Véase [security.md](docs/security.md).
+Permitir red autoriza recursos HTTPS/WSS, no navegación principal externa ni acceso a otras bibliotecas. Revocar recrea WebView con nueva política y destruye el anterior. La CSP aplica `sandbox allow-scripts` sin `allow-same-origin`: cada frame del contenido tiene origen opaco, incluso si la URL es local. Esto impide recuperar constructores de red desde un iframe vacío. Las respuestas locales incluyen CORS para módulos ES/fetch relativos. Cookies e IndexedDB no están disponibles; un shim de `localStorage`/`sessionStorage` mantiene las APIs comunes sólo en memoria por sesión. Esta limitación se aplica también al permitir red, para no convertir ese permiso en una concesión implícita de almacenamiento. No hay pretensión de sandbox perfecto: los límites y pruebas están en [security.md](docs/security.md).
 
-Las navegaciones internas conservan el documento y sus límites. URLs externas se tratan mediante una acción explícita y una política de esquema; permitir red no equivale a permitir acceso a otros documentos o lanzar aplicaciones. Antes de salir con Back, usar el historial web. Forward, reload, zoom, fullscreen y consola aparecen bajo demanda.
+Consola mediante `WebChromeClient` y callbacks de errores HTTP/recursos, buffer de hasta 300 entradas acotadas. Autoscroll se ejecuta con RAF; touch, cambio de modo y pausa del lifecycle lo detienen. Back usa historial antes de salir. Zoom, scroll y página se restauran sin reanudar autoscroll. Una caída del renderer deja los datos durables fuera de WebView y permite recargar.
 
-Capturar consola con `WebChromeClient.onConsoleMessage`; errores globales y de recursos mediante mecanismos acotados cuando sean observables. Limitar buffers; no prometer cobertura completa de errores remotos. Autoscroll con play/pause, velocidad y dirección; toque manual, cambio de modo o salida del lector lo pausa.
+## Protocolo de anotaciones v1
 
-Gestionar lifecycle: liberar WebView/observadores al salir, pausar timers cuando corresponda, conservar datos persistidos fuera del renderer, recuperar tras caída del proceso de renderizado y restaurar documento/posición sin duplicar controladores o eventos.
-
-## 6. Protocolo del controlador de anotaciones
-
-Contrato **propuesto v1**, a implementar y probar en H5. Preferir mensajería de AndroidX WebKit con restricciones de origen y frame sobre interfaces JavaScript generales; fijar la API y compatibilidad exactas en H1/H5. No incorporar un fallback inseguro para SDK antiguos.
-
-Sobre común:
+Android instala `HyperMarkerBridge` con `WebViewCompat.addWebMessageListener`. El transporte usa `*` porque los documentos aislados tienen origen opaco; esto no concede acceso a Android a cualquier origen. El host exige frame principal, URL HTTPS del documento activo, sesión/revisión, modo y payload válidos. Los mensajes de subframes y páginas externas se descartan. El editor de confianza conserva su restricción de origen exacto. El controlador envía:
 
 ```json
 {
   "protocolVersion": 1,
   "sessionId": "opaque-viewer-session",
-  "documentId": "opaque-document-id",
+  "documentId": "UUID",
   "revision": 1,
-  "requestId": "unique-request-id",
+  "requestId": "1",
   "type": "target.selected",
-  "payload": {}
+  "payload": {"pageKey": "/index.html", "anchor": {}}
 }
 ```
 
-| Dirección | Tipo | Efecto permitido |
-| --- | --- | --- |
-| Android → controlador | `session.init`, `mode.set` | Inicializar revisión, herramientas y modo autorizado. |
-| Android → controlador | `annotations.replace` | Dibujar estado ya validado y persistido. |
-| Android → controlador | `anchor.inspect`, `anchor.reanchor`, `gesture.cancel` | Iniciar inspección/reanclaje o cancelar gesto. |
-| Controlador → Android | `controller.ready` | Confirmar versión/capacidades. |
-| Controlador → Android | `target.selected` | Proponer ancla y posición; Android abre editor, sin guardar aún. |
-| Controlador → Android | `anchor.geometry`, `anchor.unresolved` | Informar geometría/estado, sin acceso a archivos. |
-| Controlador → Android | `stroke.completed` | Proponer trazo terminado sólo en Draw. |
-| Controlador → Android | `annotation.activated` | Solicitar apertura de una anotación del documento activo. |
-| Ambas | `protocol.error` | Código acotado, sin stack sensible ni ejecución de código. |
+Eventos actuales: `controller.ready`, `target.selected`, `annotation.activated`, `anchor.unresolved`, `stroke.completed`, `stroke.erase`. `BridgeValidator` verifica tamaño, versión, sesión, revisión, requestId, frecuencia, modo, tipo y geometría. El host compara `pageKey` con la navegación activa y vuelve a validar pertenencia antes de modificar datos. La sesión cambia en navegaciones completas.
 
-Validar versión, tipo, límites de tamaño, pertenencia, sesión/revisión activa, estado del modo, frame/origen, coordenadas finitas y campos permitidos. Rechazar mensajes repetidos o tardíos tras navegación, recarga, cierre o rotación. Errores de protocolo no deben cerrar la biblioteca. Validar selectors como datos; nunca concatenar texto en código ejecutable. El cuerpo de una nota se transporta como datos serializados y se renderiza con escape/sanitización.
+Android → controlador: invocación de funciones acotadas `init(config)` y `command(type,payload)` mediante `evaluateJavascript` con JSON serializado. Comandos: `mode`, `annotations`, `tool`, `cancel`, `inspect`, `selectTarget`, `autoscroll`. No se expone una interfaz nativa de eval, archivos, procesos o permisos. La geometría se actualiza en JS sin enviar cada píxel a Android.
 
-**El JS importado puede compartir el contexto con el controlador.** Un `sessionId` evita confusiones de sesión, pero no autentica de forma secreta al controlador frente a esa página. Tratar incluso mensajes del origen esperado como no confiables; autorizar efectos mínimos ligados al modo nativo, mostrar el editor antes de guardar pines y limitar frecuencia/tamaño. El bridge no permite leer rutas, ejecutar código nativo, modificar otros documentos ni conceder red. Documentar manipulación o interferencia visual residual de páginas hostiles.
+La página puede compartir contexto con el controlador: un sessionId no es autenticación secreta frente a ella. Incluso los mensajes del origen correcto son no confiables. Guardar un pin requiere el editor nativo y contenido significativo. El texto se transporta como datos; los marcadores usan `textContent`, no interpolación HTML.
 
-## 7. Gesto Pin y resolución de anclas
+## Pines, páginas y dibujos
 
-Estados: View → Pin listo → pulsación pendiente → selección activa → editor → Pin listo. Usar aproximadamente 500 ms ajustables a accesibilidad. Antes de activar, desplazamiento significativo o multitouch cancelan la selección pendiente y respetan scroll/zoom. Una vez activa, el movimiento actualiza objetivo/resaltado en vivo. `pointercancel`, salida de modo o pérdida del documento elimina resaltado y estado temporal.
+Estados: View → Pin pendiente → selección activa → editor → Pin listo. El umbral usa al menos 500 ms y respeta el timeout largo configurado en Android. Movimiento previo significativo, multitouch, cancelación y salida de modo limpian el estado. Mantener activo y deslizar actualiza el elemento bajo `elementsFromPoint`; soltar quita el resaltado y propone el editor. Existe selección accesible por lista sin long-press.
 
-En Pin, consultar `document.elementsFromPoint(clientX, clientY)`, omitir capas propias y wrappers no útiles, y elegir contenido visible con la frontera que se muestra al usuario. Resaltar con relleno translúcido y contorno por overlay, sin modificar estilos permanentes ni desplazar layout. Al soltar se retira el resaltado y se abre editor; sólo guardar contenido significativo crea un pin. Taps cortos seleccionan pines existentes y no activan controles HTML subyacentes. View restaura gestos normales; los marcadores visibles reciben únicamente su interacción explícita y ninguna capa transparente bloquea la página.
+El ancla guarda estrategia DOM/SURFACE, selector único o path, tag, texto contextual, ancestros, coordenadas normalizadas, posición aproximada, dimensiones y precisión. Reabrir resuelve selector único con tag/texto compatibles; ambigüedad, ausencia o cambio de identidad producen Unanchored. No hay reconciliación difusa V1.1. Canvas/SVG sin contenido seleccionable e iframes son superficies. Regiones grandes/transformadas se explican como rectángulos de límites.
 
-Capturar selector estable cuando exista, huella (tag, texto contextual acotado, ancestros), página, revisión y posición normalizada dentro del rectángulo del objetivo. La huella es una comprobación de identidad; un selector que ahora apunta a otro elemento no autoriza reanclaje silencioso. En V1, resolver coincidencias únicas y defendibles; ante ambigüedad o ausencia marcar UNANCHORED y ofrecer reanclaje manual. Reconciliación difusa avanzada queda para V1.1.
+`pageKey` contiene pathname y query; conserva hash sólo si empieza por `#/` o `#!` para rutas SPA. Un hash ordinario de sección no crea otra página. Pines y trazos se filtran por esa clave. Inspeccionar un pin de otra página navega a su página privada antes de resaltarlo.
 
-Recalcular con scroll, resize, zoom, rotación y observaciones DOM agrupadas; distinguir CSS pixels, viewport visual y escala nativa. Probar transformaciones y regiones grandes, mostrando límites de precisión. Canvas/WebGL y SVG sin hijos significativos se tratan como superficie con posición relativa; no como objetos semánticos internos. Iframes de origen cruzado pueden no permitir inspección interna: explicitar el límite y usar la superficie del frame cuando sea verificable.
+Los dibujos usan coordenadas de página CSS con viewport/escala, SVG y herramientas pen/highlighter/eraser. Se persiste un evento por trazo completo; clear exige confirmación. Scroll/resize/zoom/mutaciones agrupan recálculos por RAF. Las capas generales no capturan toques en View; los marcadores mantienen su interacción explícita. Reflujo puede desalinear trazos y está comunicado.
 
-## 8. Dibujos, Markdown y UX
+Undo/redo nativo conserva snapshots de sesión para creación, borrado, edición y movimiento; el estado final se guarda en Room. Los guardados de anotaciones se ordenan, y salir espera el último; un error conserva el estado en memoria y permite reintentar. Hay límites por payload, cantidad y total por documento.
 
-Dibujos: overlay SVG o equivalente, coordenadas de documento o superficie explícita, metadatos de viewport/zoom y operaciones completas de undo/redo. Persistir al finalizar cada trazo/transacción. Reabrir restaura estado persistido; se propone historial undo/redo sólo durante la sesión, salvo que pruebas/requisitos posteriores indiquen otra cosa. Clear exige confirmación. Documentar que un trazo de página puede desalinearse si el contenido cambia o refluye.
+## Markdown y decisiones finales
 
-Markdown: elegir editor mantenible con licencia documentada, edición real Source/Visual y representación compatible. Crear corpus de round-trip antes de decidir la librería. Si un constructo no puede preservarse, advertir, conservar el original y permitir seguir en Source; una vista previa por sí sola no cumple Visual. Sanitizar contenido renderizado y usar contexto controlado separado de documentos importados.
+Source usa un editor Compose. Visual usa Milkdown Crepe empaquetado localmente, sin red, CDN, estadísticas ni código HTML importado ejecutable. Cambiar de Visual a Source o salir consulta el Markdown actual antes de guardar. `MarkdownPolicy` protege construcciones no preservables y mantiene su fuente intacta; el subconjunto ordinario sí permite edición visual real.
 
-UI: biblioteca con breadcrumb, búsqueda y acciones; lector sin barra permanente, handle discreto y bottom sheet; herramientas mínimas en Pin/Draw; etiquetas TalkBack, objetivos táctiles suficientes, tipografía escalable y alternativa accesible sin long-press. Mantener navegación del sistema funcional.
-
-## 9. Decisiones y preguntas abiertas
-
-| ID | Estado | Decisión / acción | Resolver en |
-| --- | --- | --- | --- |
-| A01 | Derivada de especificación | Kotlin/Compose, Room, archivos privados y WebView controlado. | H1–H3 |
-| A02 | Propuesta | Un módulo `app` con paquetes por función. | H1 |
-| A03 | Propuesta | Markdown fuente en `.md`; Room guarda referencia/revisión. | H1/H4 |
-| A04 | Propuesta | Host local por documento; validar aislamiento efectivo de storage y red. | H2/H3 |
-| A05 | Pendiente | SDK mínimo, toolchain, namespace/applicationId y versiones fijadas. | H1 |
-| A06 | Pendiente | Librería Markdown, round-trip y licencias. | H4, exploración en H1 |
-| A07 | Propuesta | Protocolo v1, frame principal, mensajes mínimos y validación nativa. | H5 |
-| A08 | Propuesta | Historial undo/redo de sesión; estado final durable. | H4–H6 |
-| A09 | Pendiente | Identidad de páginas/rutas SPA y política de restauración web. | H3/H5 |
-| A10 | Pendiente | Licencia del proyecto y nombre visible de producto. | Antes de distribuir |
-
-Registrar fecha, motivo, alternativas relevantes y evidencia al confirmar o cambiar decisiones. Ninguna fila pendiente implica permiso para omitir un requisito V1.
+Se confirmaron Kotlin/Compose + Room + archivos privados; módulo único; anclas en JSON v1; Markdown en archivo; host por documento; protocolo acotado; historial de sesión y SDK 26/36. Las versiones están fijadas y sus licencias en el APK. Permanecen decisiones de producto posteriores: licencia del código propio, distribución de producción, V1.1 y exportación/backup. No se implementaron overrides del HTML original.

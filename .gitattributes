@@ -1,0 +1,6 @@
+* text=auto
+*.bat text eol=crlf
+app/src/main/assets/editor/* linguist-generated=true
+app/src/main/assets/licenses/* linguist-vendored=true
+fixtures/react-built/** linguist-generated=true
+web/package-lock.json linguist-generated=true

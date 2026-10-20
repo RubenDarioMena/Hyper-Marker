@@ -1,0 +1,21 @@
+{
+  "name": "hypermarker-local-editor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@milkdown/crepe": "7.22.3",
+    "@milkdown/utils": "7.22.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.51.1",
+    "esbuild": "0.28.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vite": "8.3.4"
+  }
+}

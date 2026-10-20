@@ -1,57 +1,77 @@
 # Hyper-Marker
 
-Aplicación Android nativa, offline-first, para organizar y usar proyectos HTML interactivos y notas Markdown, con pines y dibujos no destructivos. **Interactive Notes** es el nombre provisional usado en la especificación; **Hyper-Marker** identifica este repositorio. El nombre visible de la aplicación se decidirá durante la implementación.
+Aplicación Android nativa para organizar proyectos HTML interactivos y notas Markdown, leer sin barras permanentes y añadir pines o dibujos sin modificar los originales.
 
-## Estado actual
+**V1 implementada y APK debug verificado.** El estado verificable, los comandos ejecutados y los límites están en [progress.md](progress.md) y [docs/validation.md](docs/validation.md). La especificación de producto original se conserva en [Interactive_Notes_Android_Agent_Design.md](Interactive_Notes_Android_Agent_Design.md).
 
-Este repositorio contiene la documentación de arranque. **Todavía no hay aplicación, proyecto Gradle, pruebas ejecutables ni APK.** La dirección de producto está aprobada en la [especificación original](Interactive_Notes_Android_Agent_Design.md); las decisiones técnicas adicionales se identifican como propuestas en [architecture.md](architecture.md).
+## Qué incluye
 
-## Empezar aquí
+- Biblioteca con carpetas anidadas, búsqueda por nombre, creación, renombrado, movimiento, duplicación y eliminación con confirmación.
+- Importación privada de HTML/HTM, carpetas SAF y ZIP; recepción desde Compartir de Android; selección de entrada cuando existe ambigüedad.
+- WebView inmersivo con historial, recarga, zoom, consola y desplazamiento automático con velocidad/dirección y pausa por toque.
+- Markdown `.md` con edición Source y Visual mediante Milkdown local, autoguardado, undo/redo y protección del fuente frente a sintaxis no preservable.
+- Pines: mantener aproximadamente 500 ms, ver el elemento resaltado, deslizar para cambiar de objetivo y soltar para editar. Persistencia, edición, reanclaje, eliminación y estado sin ancla.
+- Pluma, resaltador, borrador, colores, anchos, undo/redo y limpieza confirmada; datos separados del HTML.
+- Modo offline por defecto y permiso explícito para recursos de red por documento.
 
-1. Leer [AGENTS.md](AGENTS.md) y la guía [Agent.md](Agent.md).
-2. Leer la [especificación original](Interactive_Notes_Android_Agent_Design.md), autoridad del alcance funcional.
-3. Revisar [architecture.md](architecture.md) y [docs/security.md](docs/security.md).
-4. Consultar [progress.md](progress.md) para conocer el estado real y continuar el primer hito pendiente del [plan de implementación](docs/implementation-plan.md).
-5. Usar [docs/testing.md](docs/testing.md) para validar entregables y registrar evidencia.
+## Compilar
 
-## Producto V1
+Requisitos: JDK 17, Android SDK con `platforms;android-36`, `build-tools;35.0.0` y platform-tools. Gradle 8.13 se descarga mediante el wrapper con checksum. Android mínimo: **8.0 / API 26**. Las funciones web necesitan Android System WebView actualizado. Versiones y licencias: [docs/dependencies.md](docs/dependencies.md).
 
-- Biblioteca de carpetas anidadas y documentos: crear, renombrar, mover, duplicar, buscar y eliminar con confirmación.
-- Importación de HTML/HTM, carpetas y ZIP mediante Storage Access Framework y recepción desde Compartir de Android; copia completa a almacenamiento privado.
-- Lector WebView inmersivo con controles bajo demanda, JavaScript, recursos relativos, consola y desplazamiento automático ajustable.
-- Notas `.md` con edición Source y Visual, autoguardado y undo/redo, preservando el texto fuente ante sintaxis no compatible.
-- Pines y dibujos persistentes en una capa separada del contenido original.
-- **En modo Pin, una pulsación prolongada de aproximadamente 500 ms resalta el elemento exacto mientras se mantiene el contacto; al deslizar cambia el resaltado y al soltar abre el editor.**
-
-V1.1 agrega modificaciones no destructivas de texto renderizado y reconciliación avanzada de anclas. RAR, exportación, inspector avanzado y demás mejoras quedan fuera de V1.
-
-## Arquitectura prevista
-
-Kotlin y Jetpack Compose para la aplicación; Room para metadatos; archivos privados para proyectos importados, Markdown y datos de dibujo; WebView con acceso local HTTPS controlado y un controlador de anotaciones JS/CSS. Las páginas importadas son contenido no confiable. El acceso de red se habilita explícitamente por documento.
-
-## Compilación e instalación
-
-**Instrucciones futuras, no verificadas:** el hito H1 creará el wrapper de Gradle y documentará versiones fijadas de JDK, Gradle, Android Gradle Plugin, Kotlin, SDK y dependencias, además del `applicationId` y el mínimo de Android con su justificación. No se debe interpretar esta sección como una compilación realizada.
-
-Una vez implementado H1, el flujo previsto desde la raíz es:
+Abrir esta carpeta en Android Studio o, desde la raíz:
 
 ```sh
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-La ruta supone un módulo `app` sin flavors; deberá actualizarse si cambia la configuración. `local.properties` y SDK locales no se versionan. Las instrucciones de pruebas están en [docs/testing.md](docs/testing.md).
+Configurar `JAVA_HOME` y `ANDROID_HOME`, o el SDK en `local.properties` (ignorado por Git). En el entorno local usado para verificar el proyecto, el JDK está en `/opt/homebrew/opt/openjdk@17`; `scripts/verify.sh` lo detecta si `JAVA_HOME` no está definido.
 
-## Flujo de uso esperado
+El APK debug se genera en `app/build/outputs/apk/debug/app-debug.apk`, applicationId `com.hypermarker`, versión `1.0.0` (1). No se incluyen claves de producción ni APK en Git. El workflow [Android debug](.github/workflows/android.yml) ejecuta tests JVM, lint y build y recopila APK/reportes como artefacto; consultar el resultado de la ejecución, no asumir éxito por la existencia del YAML.
 
-Desde la biblioteca, importar un archivo, carpeta o ZIP, o compartirlo desde otra aplicación. Se prefiere `index.html`; ante una selección ambigua se solicita una entrada al usuario. El lector abre la copia privada y permite cambiar entre View, Pin y Draw. Las notas Markdown se crean en la biblioteca. Las anotaciones se guardan sin modificar los archivos importados.
+## Usar
 
-## Límites y compatibilidad
+1. En la biblioteca, `+` permite crear carpetas/notas o importar un archivo, varios recursos compartidos, un ZIP o una carpeta HTML. También puedes enviar archivos a Hyper-Marker desde el menú Compartir de otra app.
+2. Se prefiere `index.html`. Ante varias entradas sin candidato inequívoco, elige una. Los archivos se copian a la biblioteca privada y siguen disponibles aunque desaparezca el URI original.
+3. En el lector, el botón flotante abre herramientas, navegación, consola, autoscroll y permiso de red. Android puede mostrar su aviso inicial de pantalla completa.
+4. En Pin, mantén y desliza sobre el contenido. Guardar crea el pin; cancelar deja el documento intacto. También existe selección de elemento sin pulsación prolongada. La lista de pines permite abrir, mover y reanclar notas sin ancla.
+5. En Draw, dibuja o borra trazos; volver a Ver restituye la interacción normal de la página. Las notas Markdown se editan desde la biblioteca o se crean desde el lector.
+6. Hay un ejemplo local en la biblioteca vacía y un conjunto de [fixtures](fixtures/README.md) para probar imports, React compilado, canvas, Markdown y casos maliciosos.
 
-- React/Vite se importa como salida de producción compilada con rutas relativas; JSX/TSX sin compilar no se ejecuta.
-- Un canvas/WebGL se ancla como superficie; no se identifican semánticamente objetos dibujados en su interior.
-- Los dibujos no prometen seguir el reflujo del texto. Los pines dependen de que pueda resolverse su ancla; una resolución dudosa produce estado **Unanchored**.
-- Offline significa que los archivos locales importados están disponibles sin conexión. Un documento que depende de recursos remotos puede quedar incompleto.
-- WebView no constituye un sandbox perfecto. Las limitaciones reales se documentarán a partir de las pruebas.
+## Verificar
 
-No se ha elegido una licencia de distribución del proyecto. Las dependencias que se incorporen deberán registrar versión, licencia y avisos aplicables.
+```sh
+./scripts/verify.sh
+./gradlew connectedDebugAndroidTest
+```
+
+El segundo comando requiere un dispositivo/emulador conectado. Las pruebas instrumentadas crean contenido sintético y no deben ejecutarse sobre una instalación con notas personales. El runner de Gradle puede desinstalar los APK de prueba al terminar.
+
+El editor y el fixture React compilados se versionan: Node no es necesario para compilar Android. Para regenerarlos o ejecutar sus pruebas, desde `web/`:
+
+```sh
+npm ci
+npm run build
+node licenses.mjs
+node fixtures.mjs
+npm test
+```
+
+Los tests web abren Chrome en un perfil temporal. En macOS usan Google Chrome; en otros sistemas, instalar Chromium con `npx playwright install chromium`, o proporcionar `CHROME_PATH`. Más detalles en [docs/testing.md](docs/testing.md).
+
+## Límites de V1
+
+- Importar salida HTML/JS/CSS de producción con rutas relativas. JSX/TSX requiere compilación externa. Para SPAs estáticas, preferir navegación por hash; no hay servidor de fallback para rutas inexistentes de BrowserRouter.
+- Canvas/WebGL/SVG sin hijos significativos e iframes se anclan como superficies, sin selección semántica de objetos internos. Una ancla dudosa se marca sin ancla.
+- Los dibujos usan coordenadas de página y pueden desalinearse si cambia el reflujo. Undo/redo conserva historial de sesión; el estado final sí se persiste.
+- La red opt-in permite recursos HTTPS/WSS. No habilita navegación web externa, cookies de terceros, HTTP claro, permisos de cámara/micrófono, downloads, workers, WebRTC ni acceso a otros documentos.
+- El contenido HTML usa un origen opaco: `localStorage`/`sessionStorage` se emulan en memoria durante la sesión; IndexedDB y acceso directo a otros frames no están disponibles. El estado JavaScript propio de la página no es un backup persistente. Pines, dibujos y Markdown sí se guardan de forma durable.
+- El aislamiento WebView tiene límites. Ver [docs/security.md](docs/security.md), especialmente APIs de red, frames y páginas hostiles. No se presenta como sandbox perfecto.
+- Visual cubre Markdown ordinario. HTML, imágenes, tablas, referencias y extensiones no preservables permanecen en Source con aviso. El autoguardado tiene una ventana de unos 500 ms; salir guarda explícitamente.
+- RAR, exportación/backup, sincronización, inspector avanzado y edición del texto HTML renderizado son posteriores a V1.
+
+## Continuar el proyecto
+
+Leer [AGENTS.md](AGENTS.md), [Agent.md](Agent.md), [architecture.md](architecture.md), [progress.md](progress.md), [plan](docs/implementation-plan.md) y [pruebas](docs/testing.md). La estructura real está bajo `app/src/main/java/com/hypermarker/`.
+
+Las licencias de terceros están dentro del APK, accesibles desde `+ → Licencias de código abierto`. La licencia de distribución del código propio sigue pendiente de decisión del propietario.

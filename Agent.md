@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Implementar V1 de Hyper-Marker según [Interactive_Notes_Android_Agent_Design.md](Interactive_Notes_Android_Agent_Design.md). La entrega futura incluye aplicación Android funcional, pruebas, contenido de ejemplo y un APK debug reproducible cuando el entorno permita verificarlo. **La entrega actual es únicamente documental.**
+Implementar V1 de Hyper-Marker según [Interactive_Notes_Android_Agent_Design.md](Interactive_Notes_Android_Agent_Design.md). La entrega incluye aplicación Android funcional, pruebas, contenido de ejemplo y un APK debug verificado. La base V1 ya está implementada. Consultar `progress.md` y `docs/validation.md` para conocer evidencia, límites y trabajo realmente pendiente; no reiniciar el proyecto desde cero.
 
 ## Lectura y autoridad
 

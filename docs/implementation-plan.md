@@ -1,6 +1,6 @@
 # Plan de implementación V1
 
-Estado inicial: todos los hitos de software pendientes. La documentación de arranque no completa H1. Seguir el orden de la sección 10 de la [especificación](../Interactive_Notes_Android_Agent_Design.md). Los IDs de prueba remiten a [testing.md](testing.md).
+La implementación V1 sigue estos hitos. Consultar `../progress.md` y `validation.md` para su estado actual; esta tabla define criterios, no marca todo el software como pendiente. Seguir el orden de la sección 10 de la [especificación](../Interactive_Notes_Android_Agent_Design.md). Los IDs de prueba remiten a [testing.md](testing.md).
 
 | Hito | Dependencias | Entregables | Criterio de salida |
 | --- | --- | --- | --- |

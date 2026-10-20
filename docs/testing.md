@@ -1,6 +1,6 @@
 # Plan de pruebas y aceptación
 
-**Estado: plan, no resultados. No existe aún infraestructura de pruebas.** La matriz deriva de la sección 9 de la [especificación](../Interactive_Notes_Android_Agent_Design.md) y agrega controles de consistencia necesarios para implementarla. Todos los casos siguientes están pendientes.
+**Infraestructura implementada:** tests JVM, instrumentados Android y pruebas DOM/editor con Playwright. Los resultados reales y límites de cobertura están en [validation.md](validation.md). La matriz deriva de la sección 9 de la [especificación](../Interactive_Notes_Android_Agent_Design.md) y agrega controles de consistencia necesarios para implementarla. La matriz siguiente define la aceptación; consultar el reporte para distinguir PASS, cobertura parcial y validaciones de dispositivo no realizadas.
 
 ## Estrategia
 
@@ -9,9 +9,9 @@
 - Manuales en emulador y teléfono cuando esté disponible: gesto táctil, lápiz, zoom, rotación, Sharesheet, TalkBack, inmersión y comportamiento con distintas versiones de WebView. Registrar lo no disponible.
 - Pruebas de DOM aisladas ayudan a validar selección/anclas, pero no sustituyen la integración con WebView real.
 
-## Fixtures a crear
+## Fixtures
 
-Ruta propuesta `fixtures/` con README que explique origen, licencia, generación y expectativa; hoy no existe. Mantener contenido pequeño y sintético.
+La carpeta [fixtures/](../fixtures/README.md) contiene ejemplos sintéticos, ZIP de prueba, corpus Markdown y una salida React/Vite compilada. Su README documenta regeneración y expectativas.
 
 | Fixture | Contenido y propósito |
 | --- | --- |
@@ -74,7 +74,7 @@ No almacenar bombas ZIP reales de gran tamaño: generar casos acotados usando l�
 
 ## Comandos previstos
 
-**Aún no ejecutables en este repositorio.** Tras H1 y la creación de tests/tasks correspondientes, verificar sus nombres y documentar:
+Tareas disponibles desde la raíz (JDK 17 y SDK configurados):
 
 ```sh
 ./gradlew testDebugUnitTest
