@@ -44,7 +44,17 @@
 
 ## Siguiente paso concreto
 
-Instalar el APK debug de [README.md](README.md), usarlo con documentos representativos y recoger aceptación de uso. Priorizar la validación manual de TalkBack, lápiz y proveedores SAF del teléfono habitual antes de distribuir una versión de producción. Para continuar, revisar este archivo y el reporte; no confundir cobertura automatizada aprobada con certificación completa de la matriz manual.
+Descargar el [APK debug versionado](downloads/README.md), usarlo con documentos representativos y recoger aceptación de uso. Revisar la compatibilidad de firma con cualquier instalación anterior antes de reemplazarla. Priorizar la validación manual de TalkBack, lápiz y proveedores SAF del teléfono habitual antes de distribuir una versión de producción. Para continuar, revisar este archivo y el reporte; no confundir cobertura automatizada aprobada con certificación completa de la matriz manual.
+
+## Entrega desde cloud para descarga por Git
+
+- Fuente actualizada desde `main`: `58af2aa077bc935e2fd29d7d4e20425134c767cd`. Sin cambios al código de aplicación.
+- APK generado y firmado en Linux cloud con Temurin 17.0.16+8, Gradle 8.13, SDK 36 r2 y Build Tools 35.0.0. Instalación de herramientas verificada por checksum; repetición del instalador y `assembleDebug` aprobadas.
+- Pruebas JVM **13/13 PASS**, sin omisiones; `lintDebug` **PASS**, 20 advertencias y cero errores. El primer intento falló en cinco pruebas por la caché de Robolectric en un home de sólo lectura; se configuró un home JVM escribible y la repetición pasó completa.
+- Firma APK v2, applicationId, versión, SDK y cuatro arquitecturas verificados. El hash de la copia coincide con el APK de build.
+- Por solicitud explícita del propietario, se agrega `downloads/Hyper-Marker-1.0.0-debug.apk` a Git con una excepción específica en `.gitignore`, su SHA-256 y el [registro de entrega](downloads/README.md). Las claves privadas y otras salidas siguen fuera de Git.
+- Esta compilación usa su propio certificado debug; no promete actualizar instalaciones firmadas en otro entorno. No se ejecutaron pruebas instrumentadas ni instalación/arranque en dispositivo en esta sesión cloud. Las pruebas Android de la entrega original siguen documentadas por separado.
+- Siguiente paso: descargar el APK desde GitHub y realizar pruebas de uso en el teléfono, conservando cualquier instalación con datos importantes ante una incompatibilidad de firma.
 
 ## Registro para futuras sesiones
 

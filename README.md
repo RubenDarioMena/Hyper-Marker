@@ -27,7 +27,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Configurar `JAVA_HOME` y `ANDROID_HOME`, o el SDK en `local.properties` (ignorado por Git). En el entorno local usado para verificar el proyecto, el JDK está en `/opt/homebrew/opt/openjdk@17`; `scripts/verify.sh` lo detecta si `JAVA_HOME` no está definido.
 
-La copia local de entrega está en `artifacts/Hyper-Marker-1.0.0-debug.apk`, acompañada de `.apk.sha256`; los detalles de fuente limpia, firma e instalación están en [docs/validation.md](docs/validation.md). El APK debug se genera normalmente en `app/build/outputs/apk/debug/app-debug.apk`, applicationId `com.hypermarker`, versión `1.0.0` (1). No se incluyen claves de producción ni APK en Git. El workflow [Android debug](.github/workflows/android.yml) ejecuta tests JVM, lint y build y recopila APK/reportes como artefacto; consultar el resultado de la ejecución, no asumir éxito por la existencia del YAML.
+El APK para pruebas se puede descargar desde [downloads/Hyper-Marker-1.0.0-debug.apk](downloads/Hyper-Marker-1.0.0-debug.apk?raw=1). Su [registro de entrega](downloads/README.md) identifica fuente, hash, firma y comprobaciones. Se versiona esta copia por solicitud explícita del propietario; los demás APK, SDK, caches y claves siguen siendo archivos locales.
+
+La copia local original de entrega se documenta en `artifacts/Hyper-Marker-1.0.0-debug.apk`, acompañada de `.apk.sha256`; los detalles de esa fuente limpia, firma e instalación están en [docs/validation.md](docs/validation.md). El APK debug se genera normalmente en `app/build/outputs/apk/debug/app-debug.apk`, applicationId `com.hypermarker`, versión `1.0.0` (1). No se incluyen claves privadas en Git. El workflow [Android debug](.github/workflows/android.yml) ejecuta tests JVM, lint y build y recopila APK/reportes como artefacto; consultar el resultado de la ejecución, no asumir éxito por la existencia del YAML.
 
 ## Usar
 

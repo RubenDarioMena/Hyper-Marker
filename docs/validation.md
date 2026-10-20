@@ -66,6 +66,25 @@ El APK entregado procede de ese build limpio. `apksigner verify --verbose` valid
 
 Se verifica compilación reproducible desde fuente limpia; no se promete identidad binaria entre builds incrementales, distintos paths, JDK o claves debug. La copia de entrega y sus hashes son locales e ignorados por Git, según la política del repositorio. Se usa firma debug de desarrollo; no es una publicación en Google Play ni una firma de producción.
 
+## Entrega cloud descargable por Git (2026-10-19)
+
+Se actualizó el checkout al commit `58af2aa077bc935e2fd29d7d4e20425134c767cd` y se compiló sin modificar el código de aplicación. Entorno Linux amd64, Temurin 17.0.16+8, Gradle 8.13, Android SDK 36 revisión 2 y Build Tools 35.0.0. El JDK y las herramientas de línea de comandos se descargaron de sus fuentes oficiales y se comprobaron con sus checksums. Se conservaron TLS, proxy y CA de la plataforma.
+
+Con las variables de JDK, SDK, proxy y un home JVM escribible configuradas, se ejecutaron:
+
+```sh
+./gradlew --no-daemon assembleDebug
+./gradlew --no-daemon testDebugUnitTest lintDebug
+apksigner verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
+aapt dump badging app/build/outputs/apk/debug/app-debug.apk
+```
+
+**PASS:** build y repetición incremental; 13/13 tests JVM, cero fallos/errores/omisiones; lint con 20 advertencias y cero errores; firma APK v2 y metadatos correctos. Los cuatro XML de resultados corresponden a esta ejecución. La primera ejecución de tests tuvo cinco fallos de preparación porque Robolectric intentaba escribir `/home/agent/.robolectric-download-lock` sobre un filesystem de sólo lectura; tras configurar un home JVM bajo `/workspace`, la suite completa pasó. Se probó también la repetición del instalador de herramientas y preparación del build.
+
+Por solicitud expresa del propietario, esta copia se versiona en `downloads/Hyper-Marker-1.0.0-debug.apk`, con excepción específica en `.gitignore`. Su tamaño es 21 083 303 bytes y su SHA-256 es `423f39d2f2878645b25bfa3b39447a9e8a87a3a1d71805ae21a63c5581529031`. Se comprobó que la copia y la salida de Gradle son idénticas. El [registro de entrega](../downloads/README.md) incluye fuente, certificado, arquitecturas e instrucciones.
+
+Esta copia usa la clave debug generada en cloud, conservada fuera de Git. Su hash difiere del APK local original; no se promete identidad binaria entre JDK, paths y claves debug diferentes. No se ejecutaron pruebas instrumentadas, instalación ni arranque en teléfono/emulador en esta sesión. Los resultados Android anteriores no se presentan como una ejecución de este APK cloud. Para actualizar una instalación previa se necesita la misma firma; no desinstalar una instalación con notas importantes sin resolver la preservación de sus datos.
+
 ## Cobertura pendiente explícita
 
 No se ejecutó la matriz manual completa de TalkBack, texto grande, lápiz físico, API 26, otros WebView/OEM, todos los proveedores SAF, revocaciones del sistema, agotamiento real del disco, kill en cada punto de transacción ni muerte forzada del renderer. Recuperación, cancelación y compensaciones tienen código y pruebas acotadas; no se presentan como fault injection exhaustiva. La ventana de autosave y el reflujo de dibujos están documentados.
