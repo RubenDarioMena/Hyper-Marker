@@ -27,7 +27,7 @@
 - `assembleDebug` aprobado; paquete `com.hypermarker`, versión `1.0.0` (1), mínimo API 26.
 - El último ajuste del sheet de herramientas evita su expansión parcial y pasó las 16 pruebas en el emulador. La suite del Moto corresponde a la revisión inmediatamente anterior a ese ajuste visual; no se volvió a usar el teléfono después de la instrucción de desconexión.
 - Build limpio del commit fuente `97bb5dfb1dc85c4ee1598f1baf3f25fef4aa0ad8` aprobado; APK entregado en `artifacts/Hyper-Marker-1.0.0-debug.apk`, firma verificada e instalación/arranque reales aprobados.
-- Verificación documental: 46 enlaces locales resolubles; diff de archivos propios sin problemas de whitespace. El bundle generado y textos de licencias conservan whitespace de terceros.
+- Verificación documental: 47 enlaces locales resolubles; diff de archivos propios sin problemas de whitespace. El bundle generado y textos de licencias conservan whitespace de terceros.
 - Especificación original intacta: SHA-256 `c779db1ae246f5aba1e1084df4b0c7b3a4fc669ead8f4ded080846de5c44fdfb`.
 
 ## Decisiones y límites de compatibilidad
