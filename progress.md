@@ -17,7 +17,7 @@
 | H5 — Pines | Implementado. Long-press real con resaltado mientras se sostiene y actualización al deslizar; guardar/cancelar, editar, reanclar, borrar, undo/redo y Unanchored. Pruebas táctiles Android y DOM aprobadas. |
 | H6 — Dibujos | Implementado. Pluma/resaltador/borrador, color/ancho, SVG en coordenadas de página, historial, persistencia y limpieza confirmada. Pruebas de trazo y regreso a View aprobadas. |
 | H7 — Endurecimiento | Implementado y validado con automatización. Se detectó y corrigió un escape WebRTC vía iframe vacío; origen opaco y restricciones tempranas ahora lo bloquean. La cobertura manual de accesibilidad y hardware sigue limitada, como detalla el reporte. |
-| H8 — APK y relevo | APK debug firmado generado, lint y build aprobados. La comprobación adicional desde archivo Git limpio se registra en el cierre del reporte. Instrucciones, licencias, fixtures y CI incluidos. |
+| H8 — APK y relevo | APK debug firmado generado desde archivo Git limpio, instalado y abierto en el emulador. Hash y fuente registrados en el reporte. Instrucciones, licencias, fixtures y CI incluidos. |
 
 ## Resultados ejecutados
 
@@ -26,6 +26,8 @@
 - `lintDebug` aprobado sin errores; quedan advertencias de actualizaciones de dependencias y recomendaciones de Android/estilo. No se afirma lint sin advertencias.
 - `assembleDebug` aprobado; paquete `com.hypermarker`, versión `1.0.0` (1), mínimo API 26.
 - El último ajuste del sheet de herramientas evita su expansión parcial y pasó las 16 pruebas en el emulador. La suite del Moto corresponde a la revisión inmediatamente anterior a ese ajuste visual; no se volvió a usar el teléfono después de la instrucción de desconexión.
+- Build limpio del commit fuente `97bb5dfb1dc85c4ee1598f1baf3f25fef4aa0ad8` aprobado; APK entregado en `artifacts/Hyper-Marker-1.0.0-debug.apk`, firma verificada e instalación/arranque reales aprobados.
+- Verificación documental: 46 enlaces locales resolubles; diff de archivos propios sin problemas de whitespace. El bundle generado y textos de licencias conservan whitespace de terceros.
 - Especificación original intacta: SHA-256 `c779db1ae246f5aba1e1084df4b0c7b3a4fc669ead8f4ded080846de5c44fdfb`.
 
 ## Decisiones y límites de compatibilidad

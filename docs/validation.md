@@ -49,7 +49,16 @@ Para repetir: `./scripts/verify.sh`, `./gradlew connectedDebugAndroidTest`, y `c
 
 ## APK y comprobación desde fuente limpia
 
-APK de build: `app/build/outputs/apk/debug/app-debug.apk`. La copia de entrega, hash y comprobación adicional desde archivo Git limpio se registran al finalizar el cierre. Se usa firma debug de desarrollo; no es una publicación en Google Play ni una firma de producción.
+**PASS:** se exportó el commit fuente `97bb5dfb1dc85c4ee1598f1baf3f25fef4aa0ad8` con `git archive` a `artifacts/clean-source/`, sin `local.properties`, caches ni archivos de build del checkout, y se ejecutó `:app:assembleDebug` con JDK 17 y `ANDROID_HOME` configurado. Se ejecutaron 38 tareas y el build finalizó correctamente. Node no intervino: los assets generados necesarios están en Git.
+
+El APK entregado procede de ese build limpio. `apksigner verify --verbose` validó la firma APK v2; `aapt dump badging` confirmó paquete/versión/SDK. Se instaló con `adb -s emulator-5554 install -r` y abrió mediante `am start -W` con **Status: ok**. Captura local: `artifacts/verification/delivery-library.png`; proceso activo, sin error AndroidRuntime observado en el arranque.
+
+- Copia de entrega: `artifacts/Hyper-Marker-1.0.0-debug.apk` (**21 083 303 bytes**).
+- Hash: `artifacts/Hyper-Marker-1.0.0-debug.apk.sha256`.
+- SHA-256: `e17fbfa9bbb6392c3277272344493daf6b18fc6fb42593824639083a0f64a639`.
+- APK de compilación habitual: `app/build/outputs/apk/debug/app-debug.apk`.
+
+Se verifica compilación reproducible desde fuente limpia; no se promete identidad binaria entre builds incrementales, distintos paths, JDK o claves debug. La copia de entrega y sus hashes son locales e ignorados por Git, según la política del repositorio. Se usa firma debug de desarrollo; no es una publicación en Google Play ni una firma de producción.
 
 ## Cobertura pendiente explícita
 
