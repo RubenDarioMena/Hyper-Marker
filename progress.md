@@ -28,6 +28,7 @@
 - El último ajuste del sheet de herramientas evita su expansión parcial y pasó las 16 pruebas en el emulador. La suite del Moto corresponde a la revisión inmediatamente anterior a ese ajuste visual; no se volvió a usar el teléfono después de la instrucción de desconexión.
 - Build limpio del commit fuente `97bb5dfb1dc85c4ee1598f1baf3f25fef4aa0ad8` aprobado; APK entregado en `artifacts/Hyper-Marker-1.0.0-debug.apk`, firma verificada e instalación/arranque reales aprobados.
 - Verificación documental: 47 enlaces locales resolubles; diff de archivos propios sin problemas de whitespace. El bundle generado y textos de licencias conservan whitespace de terceros.
+- **CI remota PASS:** ejecución [39362311919](https://github.com/RubenDarioMena/Hyper-Marker/actions/runs/39362311919) del commit `02e6b8c`; JVM/lint/build y upload del APK/reportes aprobados. Corregido el uso del paquete SDK obsoleto `tools` en el setup.
 - Especificación original intacta: SHA-256 `c779db1ae246f5aba1e1084df4b0c7b3a4fc669ead8f4ded080846de5c44fdfb`.
 
 ## Decisiones y límites de compatibilidad

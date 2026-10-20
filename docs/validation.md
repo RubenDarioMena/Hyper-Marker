@@ -47,6 +47,12 @@ Los reportes regenerables quedan en:
 
 Para repetir: `./scripts/verify.sh`, `./gradlew connectedDebugAndroidTest`, y `cd web && npm ci && npm test`. Usar sólo instalaciones de prueba: el runner puede desinstalar la aplicación. El workflow Android incluido ejecuta JVM/lint/build y recopila artefactos; su existencia no certifica una ejecución remota aprobada.
 
+## CI remota
+
+**PASS:** [Android debug, ejecución 39362311919](https://github.com/RubenDarioMena/Hyper-Marker/actions/runs/39362311919) sobre el commit `02e6b8cc329a0e202cba6fc59a9a8e8cf74cbaa3`, en Ubuntu con Temurin 17. Pasaron preparación de SDK, tests JVM, lint, build y upload de artefacto `hypermarker-debug-and-reports`. Contiene APK debug y reportes, con retención de 14 días. Los tests instrumentados y web se ejecutaron localmente, no en este workflow.
+
+La primera ejecución falló porque el setup intentaba instalar el paquete Android `tools`, retirado del repositorio SDK. Se fijó `packages: platform-tools`; la ejecución enlazada verifica la corrección. El cambio sólo afecta CI; el código Android del APK de entrega permanece igual. Este cierre documental no requiere repetir las suites.
+
 ## APK y comprobación desde fuente limpia
 
 **PASS:** se exportó el commit fuente `97bb5dfb1dc85c4ee1598f1baf3f25fef4aa0ad8` con `git archive` a `artifacts/clean-source/`, sin `local.properties`, caches ni archivos de build del checkout, y se ejecutó `:app:assembleDebug` con JDK 17 y `ANDROID_HOME` configurado. Se ejecutaron 38 tareas y el build finalizó correctamente. Node no intervino: los assets generados necesarios están en Git.
