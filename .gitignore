@@ -1,0 +1,25 @@
+# Configuración y archivos locales
+.DS_Store
+.idea/
+*.iml
+local.properties
+.env
+.env.*
+!.env.example
+
+# Gradle / Android / Kotlin (conservar el wrapper cuando se cree)
+.gradle/
+.kotlin/
+**/build/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Herramientas auxiliares y contenido generado
+node_modules/
+__pycache__/
+*.pyc
