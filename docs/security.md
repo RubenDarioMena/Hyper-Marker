@@ -37,7 +37,7 @@ El editor confiable usa origen exacto. El lector aislado necesita transporte de 
 
 La página comparte contexto con el controlador: una sesión no es un secreto frente a ella. Por ello los mensajes siguen siendo no confiables. No existe `addJavascriptInterface`, eval nativo expuesto, lectura arbitraria de archivos, ejecución de procesos, intents ni concesión de permisos. Guardar pines requiere editor nativo y contenido significativo.
 
-`BridgeValidator` limita tipos, tamaño, frecuencia, IDs de petición y coordenadas finitas. El repositorio verifica pertenencia, cantidad, tamaño agregado y tipos de anotación. Títulos/Markdown viajan como JSON y se presentan como texto o mediante un editor controlado; no se interpolan como scripts. Fuente Markdown con HTML/extensiones no preservables permanece en Source.
+`BridgeValidator` limita tipos, tamaño, frecuencia, IDs de petición y coordenadas finitas. `longpress` sólo se acepta en Ver/Dibujar y con rectángulo finito y positivo; `target.selected` sólo en Editar, con texto acotado a 20 000 caracteres y listas de ids acotadas. Esas listas no son confiables: borrar adjuntos o cambios sólo elimina ids existentes del tipo y página indicados, tras confirmación y con deshacer. Las sustituciones de texto se aplican con `textContent`, nunca como HTML, no modifican el archivo original y excluyen campos de formulario. El repositorio verifica pertenencia, cantidad, tamaño agregado y tipos de anotación. Títulos/Markdown viajan como JSON y se presentan como texto o mediante un editor controlado; no se interpolan como scripts. Fuente Markdown con HTML/extensiones no preservables permanece en Source.
 
 ## Disponibilidad y riesgos residuales
 

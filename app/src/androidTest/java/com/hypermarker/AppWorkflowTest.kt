@@ -45,6 +45,21 @@ class AppWorkflowTest {
         }
         return find(By.text(text))
     }
+    /** El cromo de cristal se alterna tocando la página; sólo se toca si está oculto. */
+    private fun showChrome() {
+        if (device.wait(Until.hasObject(By.desc("Opciones del documento")), 600)) return
+        device.click(device.displayWidth / 2, device.displayHeight * 3 / 4)
+        find(By.desc("Opciones del documento"))
+    }
+    /** En Ver el cromo se oculta solo; reintenta si desaparece durante el clic. */
+    private fun openMenu() {
+        repeat(4) {
+            showChrome()
+            runCatching { device.findObject(By.desc("Opciones del documento"))?.click() }
+            if (device.wait(Until.hasObject(By.text("Personalizar cruceta")), 1500)) return
+        }
+        find(By.text("Personalizar cruceta"))
+    }
     private fun web(root: View): WebView? {
         if (root is WebView) return root
         if (root is ViewGroup) for (i in 0 until root.childCount) web(root.getChildAt(i))?.let { return it }
@@ -84,11 +99,12 @@ class AppWorkflowTest {
         val intent = Intent(context, MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/html").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val scenario = ActivityScenario.launch<MainActivity>(intent)
         try {
-            find(By.desc("Herramientas del documento"))
+            find(By.desc("Opciones del documento"))
             device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)(Got it|Entendido|Aceptar)"))), 2000)?.click()
-            find(By.desc("Herramientas del documento")).click()
-            find(By.text("Pin")).click(); SystemClock.sleep(400)
-            waitFor(scenario, "document.documentElement.dataset.hypermarkerMode", "PIN")
+            assertFalse(device.hasObject(By.desc("Herramientas del documento")))
+            showChrome()
+            find(By.desc("Modo Editar")).click(); SystemClock.sleep(400)
+            waitFor(scenario, "document.documentElement.dataset.hypermarkerMode", "EDIT")
             var coords = Pair(0f, 0f)
             val raw = evaluate(scenario, "JSON.stringify((()=>{let r=document.getElementById('target').getBoundingClientRect();return [r.left+40,r.top+40]})())") as String
             val css = JSONArray(raw)
@@ -106,7 +122,9 @@ class AppWorkflowTest {
             }
             android.util.Log.i("Workflow", "coords=$coords css=$css scale="+evaluate(scenario,"devicePixelRatio")+" viewport="+evaluate(scenario,"innerWidth+'x'+innerHeight"))
             saveScreenshot("workflow-pin-ready")
-            gesture(); find(By.text("Nueva nota anclada"))
+            gesture(); find(By.desc("Cruceta de acciones"))
+            saveScreenshot("workflow-edit-cross")
+            find(By.desc("Nota pin")).click(); find(By.text("Nueva nota anclada"))
             val inputs = device.findObjects(By.clazz("android.widget.EditText")).sortedBy { it.visibleBounds.top }
             assertEquals(2, inputs.size); inputs[0].text = "Idea persistente"; inputs[1].text = "**Contexto** de la idea"
             find(By.text("Guardar")).click(); SystemClock.sleep(800)
@@ -114,7 +132,7 @@ class AppWorkflowTest {
             assertEquals(1, runBlocking { repo.annotations(doc.id).size })
             saveScreenshot("workflow-pin-saved")
             coords = coords.first + 170f to coords.second
-            gesture(); find(By.text("Nueva nota anclada")); find(By.text("Cancelar")).click(); SystemClock.sleep(300)
+            gesture(); find(By.desc("Nota pin")).click(); find(By.text("Nueva nota anclada")); find(By.text("Cancelar")).click(); SystemClock.sleep(300)
             assertEquals(1, runBlocking { repo.annotations(doc.id).size })
             find(By.desc("Deshacer")).click(); SystemClock.sleep(300)
             assertEquals(0, runBlocking { repo.annotations(doc.id).size })
@@ -122,14 +140,14 @@ class AppWorkflowTest {
             assertEquals(1, runBlocking { repo.annotations(doc.id).size })
             device.setOrientationLeft(); SystemClock.sleep(700)
             device.setOrientationNatural(); SystemClock.sleep(700)
-            scenario.recreate(); find(By.desc("Herramientas del documento"))
+            scenario.recreate()
             waitFor(scenario, "document.querySelector('#__hypermarker_overlay')?.shadowRoot.querySelectorAll('.pin').length", 1)
-            find(By.desc("Herramientas del documento")).click()
+            openMenu()
             scrollTo("Crear nota Markdown"); device.waitForIdle()
             repeat(3) {
-                if (!device.hasObject(By.text("Source"))) {
+                if (!device.hasObject(By.text("Fuente"))) {
                     device.findObject(By.text("Crear nota Markdown"))?.click()
-                    device.wait(Until.hasObject(By.text("Source")), 2000)
+                    device.wait(Until.hasObject(By.text("Fuente")), 2000)
                 }
             }
             SystemClock.sleep(500)
@@ -143,7 +161,7 @@ class AppWorkflowTest {
             saveScreenshot("workflow-markdown-visual")
             evaluate(scenario, "(()=>{const e=document.querySelector('.ProseMirror');e.focus();const selection=getSelection();selection.selectAllChildren(e);selection.collapseToEnd();document.execCommand('insertText',false,' Texto visual');return true})()")
             SystemClock.sleep(900)
-            find(By.text("Source")).click(); SystemClock.sleep(300)
+            find(By.text("Fuente")).click(); SystemClock.sleep(300)
             assertTrue(find(By.clazz("android.widget.EditText")).text.contains("Texto visual"))
             scenario.recreate(); SystemClock.sleep(300)
             assertTrue(find(By.clazz("android.widget.EditText")).text.contains("Texto visual"))

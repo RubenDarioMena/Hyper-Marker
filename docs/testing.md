@@ -52,18 +52,24 @@ No almacenar bombas ZIP reales de gran tamaño: generar casos acotados usando l�
 | MD-02 | Cambiar modos con sintaxis no soportada. | Advertencia y fuente autoritativa preservada, sin pérdida silenciosa. |
 | MD-03 | Autosave, undo/redo, navegación y cierre abrupto. | Revisiones guardadas recuperables, sin guardado antiguo sobrescribiendo nuevo; ventana de pérdida documentada. |
 | MD-04 | Markdown con HTML/scripts/links maliciosos en nota y pin. | Renderizado seguro, sin ejecución o acceso nativo no autorizado. |
-| PIN-01 | Mantener aproximadamente 500 ms en Pin. | Resaltado con relleno y contorno del elemento exacto aparece **mientras se sostiene**. |
+| PIN-01 | Mantener aproximadamente 500 ms en Editar. | Resaltado con relleno y contorno del elemento exacto aparece **mientras se sostiene**. |
 | PIN-02 | Deslizar tras activar, sin soltar. | Objetivo y límites visuales se actualizan en vivo. |
-| PIN-03 | Soltar, cancelar, guardar vacío y guardar contenido. | Editor al soltar; sin pin al cancelar/vacío; pin persistente sólo al guardar contenido significativo. |
+| PIN-03 | Soltar, elegir Nota pin, cancelar, guardar vacío y guardar contenido. | Cruceta al soltar con el elemento resaltado; Nota pin abre el editor; sin pin al cancelar/vacío; pin persistente sólo al guardar contenido significativo. |
 | PIN-04 | Scroll/zoom/rotación/cerrar y reabrir, y cambiar de página interna. | Pin conserva objetivo y posición relativa; no aparece en otra página indebidamente. |
 | PIN-05 | Texto, enlace, DOM anidado, canvas/SVG, transformaciones e iframe. | Objetivo mostrado coincide con ancla; límites de superficie/iframe explícitos, sin precisión semántica falsa. |
 | PIN-06 | Eliminar/reemplazar objetivo o reutilizar selector para otro elemento. | Recuperación única defendible o Unanchored; jamás adhesión silenciosa incorrecta. |
-| PIN-07 | Tap corto, multitouch, movimiento previo al umbral, pointercancel y salida de modo. | No activa links en Pin; cancela gestos ambiguos; limpia resaltado/estado. |
+| PIN-07 | Tap corto, multitouch, movimiento previo al umbral, pointercancel y salida de modo. | No activa links en Editar; cancela gestos ambiguos; limpia resaltado/estado. |
 | PIN-08 | Abrir/editar/mover/reanclar/borrar pin, undo/redo y volver a abrir. | Operaciones coherentes y persistencia del estado final. |
 | PIN-09 | Salir a View; usar links, botones, scroll; alternativa accesible de selección. | Interactividad normal restaurada y creación/reanclaje accesible sin long-press. |
 | DRAW-01 | Pen/highlighter/eraser, color/ancho, scroll, undo/redo y reabrir. | Trazo correcto, estado final persistente y coordenadas consistentes. |
 | DRAW-02 | Clear con cancelación/confirmación; zoom y rotación. | Confirmación respetada; sin pérdida accidental; reflujo documentado. |
 | DRAW-03 | Cambiar Draw → View y usar controles HTML. | Capas no capturan eventos indebidamente. |
+| UI-01 | Tocar la página en Ver fuera y dentro de contenido interactivo; esperar; tocar en Editar/Dibujar. | El cromo (opciones + Ver/Editar/Dibujar) se alterna sólo fuera de botones/enlaces; en Ver se oculta solo; en Dibujar un toque breve con el dedo no deja punto. |
+| UI-02 | Mantener presionado en Ver, Editar y Dibujar. | Cruceta de cuatro acciones del modo en el punto soltado; en Ver/Editar el elemento queda resaltado; el clic del contenido no se activa. |
+| UI-03 | Reasignar desde la cruceta y desde el menú; cerrar y reabrir. | Intercambio sin duplicados, acción desplazada visible en el menú y persistencia entre documentos. |
+| UI-04 | Acercar elemento y Zoom original. | El bloque completo cabe y queda centrado; la vuelta restablece la escala inicial. |
+| TXT-01 | Editar texto de un elemento, recargar, restaurar y deshacer. | Override separado, reaplicado sólo si el original coincide, restauración de los nodos originales; inputs/superficies no editables; pines del elemento siguen anclados. |
+| MD-05 | Seleccionar texto en Fuente y Visual y aplicar estilo, tipo de letra, listas, cita, código, enlace, tabla y separador; alternar hoja oscura. | El formato se aplica a la selección (o al cursor) y repetirlo lo retira; tablas GFM bien formadas se editan en Visual; tema y letra persisten. |
 | SEC-01 | Pedir rutas fuera del proyecto, codificadas y de otro documento. | Rechazo sin lectura ni fallback de red/filesystem. |
 | SEC-02 | Abrir documento OFFLINE con recursos locales y remotos. | Local funciona sin conexión; no salen solicitudes remotas por canales probados, incluidos sockets/workers. |
 | SEC-03 | Permitir red en A, abrir B, revocar en A con conexiones activas. | Permiso sólo de A; revocación efectiva; B continúa OFFLINE. |

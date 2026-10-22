@@ -1,4 +1,13 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'">
-<link rel="stylesheet" href="editor.css"><style>html,body{margin:0;background:#fffdf7;color:#233c36} .milkdown{--crepe-font-family:system-ui;--crepe-font-family-title:system-ui}.milkdown .ProseMirror{padding:24px 22px 100px!important;min-height:65vh} #error{padding:24px;color:#a22}</style></head>
+<link rel="stylesheet" href="editor.css"><style>
+html,body{margin:0;background:#fff;color:#111}html.dark,html.dark body{background:#121212;color:#ededed}
+.milkdown{--crepe-color-background:#fff;--crepe-color-on-background:#111;--crepe-color-surface:#f6f6f6;--crepe-color-surface-low:#efefef;--crepe-color-on-surface:#1a1a1a;--crepe-color-on-surface-variant:#555;--crepe-color-outline:#b4b4b4;--crepe-color-primary:#111;--crepe-color-secondary:#d9d9d9;--crepe-color-hover:#ececec;--crepe-color-selected:#dcdcdc;--crepe-color-inline-area:#f0f0f0;--crepe-color-inline-code:#b3261e;
+  --crepe-font-default:system-ui,Roboto,'Noto Sans',sans-serif;--crepe-font-title:system-ui,Roboto,'Noto Sans',sans-serif;--crepe-font-code:ui-monospace,'Roboto Mono','Droid Sans Mono',monospace;--crepe-base-font-size:17px}
+html.dark .milkdown{--crepe-color-background:#121212;--crepe-color-on-background:#ededed;--crepe-color-surface:#1c1c1c;--crepe-color-surface-low:#202020;--crepe-color-on-surface:#e0e0e0;--crepe-color-on-surface-variant:#a6a6a6;--crepe-color-outline:#6b6b6b;--crepe-color-primary:#ededed;--crepe-color-secondary:#3a3a3a;--crepe-color-on-secondary:#eee;--crepe-color-hover:#262626;--crepe-color-selected:#333;--crepe-color-inline-area:#262626;--crepe-color-inline-code:#ff8a80;--crepe-shadow-1:0 1px 3px rgba(0,0,0,.6);--crepe-shadow-2:0 2px 8px rgba(0,0,0,.6)}
+html[data-font=serif] .milkdown{--crepe-font-default:'Noto Serif',Georgia,serif;--crepe-font-title:'Noto Serif',Georgia,serif}
+html[data-font=mono] .milkdown{--crepe-font-default:ui-monospace,'Roboto Mono','Droid Sans Mono',monospace;--crepe-font-title:ui-monospace,'Roboto Mono','Droid Sans Mono',monospace}
+.milkdown .ProseMirror{padding:28px 24px 120px!important;min-height:80vh;max-width:760px;margin:0 auto;line-height:1.6}
+.milkdown .ProseMirror h1,.milkdown .ProseMirror h2,.milkdown .ProseMirror h3{font-weight:700;letter-spacing:-.01em;line-height:1.25}.milkdown .ProseMirror h1{font-size:30px}.milkdown .ProseMirror h2{font-size:24px}.milkdown .ProseMirror h3{font-size:20px}
+#error{padding:24px;color:#a22}</style></head>
 <body><div id="editor"></div><div id="error" role="alert"></div><script src="editor.js"></script></body></html>

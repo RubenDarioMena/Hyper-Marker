@@ -8,9 +8,11 @@ Aplicación Android nativa para organizar proyectos HTML interactivos y notas Ma
 
 - Biblioteca con carpetas anidadas, búsqueda por nombre, creación, renombrado, movimiento, duplicación y eliminación con confirmación.
 - Importación privada de HTML/HTM, carpetas SAF y ZIP; recepción desde Compartir de Android; selección de entrada cuando existe ambigüedad.
-- WebView inmersivo con historial, recarga, zoom, consola y desplazamiento automático con velocidad/dirección y pausa por toque.
-- Markdown `.md` con edición Source y Visual mediante Milkdown local, autoguardado, undo/redo y protección del fuente frente a sintaxis no preservable.
-- Pines: mantener aproximadamente 500 ms, ver el elemento resaltado, deslizar para cambiar de objetivo y soltar para editar. Persistencia, edición, reanclaje, eliminación y estado sin ancla.
+- WebView inmersivo sin barras: un toque muestra u oculta el botón de opciones (arriba a la derecha) y tres botones de cristal translúcido para los modos Ver, Editar y Dibujar. Historial, recarga, zoom al elemento y zoom original, consola y desplazamiento automático con velocidad/dirección y pausa por toque.
+- Markdown `.md` sobre una hoja blanca (u oscura opcional) con edición Fuente y Visual mediante Milkdown local. La barra superior monocroma aplica estilo, tipo de letra, negrita, cursiva, tachado, código, enlaces, listas, citas, bloques de código, tablas y separadores sobre el texto seleccionado. Autoguardado, undo/redo y protección del fuente frente a sintaxis no preservable.
+- Cruceta de cuatro acciones por modo al mantener presionado, reasignable y persistente; las demás acciones quedan en el menú de opciones.
+- Pines: en Editar, mantener aproximadamente 500 ms, ver el elemento resaltado, deslizar para cambiar de objetivo y soltar para abrir la cruceta (Nota pin, Editar texto, Borrar adjuntos, Borrar cambios). Persistencia, edición, reanclaje, eliminación y estado sin ancla.
+- Edición del texto visible como sustitución separada del HTML original, con restauración por elemento o desde la lista de notas y cambios.
 - Pluma, resaltador, borrador, colores, anchos, undo/redo y limpieza confirmada; datos separados del HTML.
 - Modo offline por defecto y permiso explícito para recursos de red por documento.
 
@@ -35,10 +37,11 @@ La copia local original de entrega se documenta en `artifacts/Hyper-Marker-1.0.0
 
 1. En la biblioteca, `+` permite crear carpetas/notas o importar un archivo, varios recursos compartidos, un ZIP o una carpeta HTML. También puedes enviar archivos a Hyper-Marker desde el menú Compartir de otra app.
 2. Se prefiere `index.html`. Ante varias entradas sin candidato inequívoco, elige una. Los archivos se copian a la biblioteca privada y siguen disponibles aunque desaparezca el URI original.
-3. En el lector, el botón flotante abre herramientas, navegación, consola, autoscroll y permiso de red. Android puede mostrar su aviso inicial de pantalla completa.
-4. En Pin, mantén y desliza sobre el contenido. Guardar crea el pin; cancelar deja el documento intacto. También existe selección de elemento sin pulsación prolongada. La lista de pines permite abrir, mover y reanclar notas sin ancla.
-5. En Draw, dibuja o borra trazos; volver a Ver restituye la interacción normal de la página. Las notas Markdown se editan desde la biblioteca o se crean desde el lector.
-6. Hay un ejemplo local en la biblioteca vacía y un conjunto de [fixtures](fixtures/README.md) para probar imports, React compilado, canvas, Markdown y casos maliciosos.
+3. En el lector, toca la página (fuera de botones y enlaces) para mostrar u ocultar los controles. El botón de opciones abre navegación, consola, autoscroll, permiso de red, las acciones que no están en la cruceta y su personalización. Android puede mostrar su aviso inicial de pantalla completa.
+4. Mantén presionado en cualquier modo para abrir la cruceta. Ver: Autoscroll, Acercar elemento, Zoom original y Recargar. Editar: Nota pin, Editar texto, Borrar adjuntos y Borrar cambios. Dibujar: Color, Grosor, Herramienta y Estabilizar (aún no disponible). Mantén una opción de la cruceta, o usa el botón de intercambio del menú, para reasignarla.
+5. En Editar, mantén y desliza sobre el contenido; al soltar, el elemento queda resaltado y la cruceta actúa sobre él. Guardar crea el pin; cancelar deja el documento intacto. También existe selección de elemento sin pulsación prolongada desde el menú. La lista de notas y cambios permite abrir, mover y reanclar notas sin ancla y restaurar textos.
+6. En Dibujar, dibuja o borra trazos; un toque breve con el dedo muestra los controles y no deja un punto. Volver a Ver restituye la interacción normal de la página. Las notas Markdown se editan desde la biblioteca o se crean desde el lector.
+7. Hay un ejemplo local en la biblioteca vacía y un conjunto de [fixtures](fixtures/README.md) para probar imports, React compilado, canvas, Markdown y casos maliciosos.
 
 ## Verificar
 
@@ -69,8 +72,10 @@ Los tests web abren Chrome en un perfil temporal. En macOS usan Google Chrome; e
 - La red opt-in permite recursos HTTPS/WSS. No habilita navegación web externa, cookies de terceros, HTTP claro, permisos de cámara/micrófono, downloads, workers, WebRTC ni acceso a otros documentos.
 - El contenido HTML usa un origen opaco: `localStorage`/`sessionStorage` se emulan en memoria durante la sesión; IndexedDB y acceso directo a otros frames no están disponibles. El estado JavaScript propio de la página no es un backup persistente. Pines, dibujos y Markdown sí se guardan de forma durable.
 - El aislamiento WebView tiene límites. Ver [docs/security.md](docs/security.md), especialmente APIs de red, frames y páginas hostiles. No se presenta como sandbox perfecto.
-- Visual cubre Markdown ordinario. HTML, imágenes, tablas, referencias y extensiones no preservables permanecen en Source con aviso. El autoguardado tiene una ventana de unos 500 ms; salir guarda explícitamente.
-- RAR, exportación/backup, sincronización, inspector avanzado y edición del texto HTML renderizado son posteriores a V1.
+- Visual cubre Markdown ordinario y tablas GFM bien formadas (Visual normaliza el relleno de columnas y usa `*` en listas). HTML, imágenes, tablas incompletas, referencias y extensiones no preservables permanecen en Fuente con aviso. El autoguardado tiene una ventana de unos 500 ms; salir guarda explícitamente.
+- En Ver, la pulsación prolongada abre la cruceta en lugar de la selección de texto nativa del WebView. Los botones de cristal son translúcidos con tono adaptado al fondo; Compose no puede desenfocar el WebView situado detrás, así que no hay desenfoque real.
+- La edición de texto sustituye el texto visible del elemento (formato interno incluido) sin tocar el archivo. En SPAs que vuelven a renderizar, la sustitución se reaplica como mejor esfuerzo y, si el contenido cambia, queda sin coincidencia.
+- RAR, exportación/backup, sincronización e inspector avanzado son posteriores.
 
 ## Continuar el proyecto
 

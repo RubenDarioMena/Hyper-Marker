@@ -3,7 +3,11 @@ package com.hypermarker.viewer
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.RectF
 import android.net.Uri
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.webkit.*
 import androidx.webkit.*
@@ -14,6 +18,7 @@ import com.hypermarker.storage.LibraryRepository
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.util.UUID
+import kotlin.math.roundToInt
 
 @SuppressLint("SetJavaScriptEnabled")
 class DocumentWebView(context: Context, val document: Document, private val repository: LibraryRepository,
@@ -25,6 +30,18 @@ class DocumentWebView(context: Context, val document: Document, private val repo
     var mode: String = "VIEW"
         private set
     var touched: () -> Unit = {}
+    /** Toque simple sin bridge disponible; con bridge, el controlador distingue contenido interactivo. */
+    var tapped: () -> Unit = {}
+    /** Última posición táctil en px de la vista; la cruceta se dibuja allí. */
+    var lastTouchX = 0f
+        private set
+    var lastTouchY = 0f
+        private set
+    private var pendingScale: ((Float) -> Unit)? = null
+    private val settleScale = Runnable { pendingScale?.let { action -> pendingScale = null; @Suppress("DEPRECATION") action(scale) } }
+    private val taps = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean { if (!bridgeAvailable) tapped(); return false }
+    })
     val earlyScriptAvailable = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
     val bridgeAvailable = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) && earlyScriptAvailable
     private val controller by lazy { context.assets.open("annotation/controller.js").bufferedReader().use { it.readText() } }
@@ -115,16 +132,61 @@ class DocumentWebView(context: Context, val document: Document, private val repo
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) { console("Recurso no disponible: ${request?.url?.lastPathSegment} · ${error?.description}") }
             override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?) { console("HTTP ${response?.statusCode}: ${request?.url?.lastPathSegment}") }
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean { crashed(); return true }
+            override fun onScaleChanged(view: WebView?, oldScale: Float, newScale: Float) {
+                if (pendingScale != null) { removeCallbacks(settleScale); postDelayed(settleScale, 120) }
+            }
         }
         setDownloadListener { _, _, _, _, _ -> console("Las descargas del documento están deshabilitadas. Importa archivos desde la biblioteca.") }
-        setOnLongClickListener { mode != "VIEW" }
+        // Con bridge, la pulsación prolongada abre la cruceta en todos los modos en lugar de la selección nativa.
+        setOnLongClickListener { bridgeAvailable || mode != "VIEW" }
     }
     override fun performClick(): Boolean { super.performClick(); return true }
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        lastTouchX = event.x; lastTouchY = event.y
+        taps.onTouchEvent(event)
         if (event.actionMasked == MotionEvent.ACTION_DOWN) touched()
         if (event.actionMasked == MotionEvent.ACTION_UP && mode == "VIEW") performClick()
         return super.onTouchEvent(event)
     }
+    /** Encaja el rectángulo (CSS px de documento) completo en la vista y lo centra. */
+    fun zoomToFit(x: Double, y: Double, w: Double, h: Double) {
+        if (w <= 0 || h <= 0 || width == 0 || height == 0) return
+        val target = (minOf(width / w, height / h) * 0.98).toFloat()
+        scaleThen(target) { actual ->
+            scrollTo((x * actual - (width - w * actual) / 2).roundToInt().coerceAtLeast(0), (y * actual - (height - h * actual) / 2).roundToInt().coerceAtLeast(0))
+        }
+    }
+    /** Vuelve a la escala mínima permitida por la página, que equivale a la vista original sin zoom. */
+    fun resetZoom() { scaleThen(0f) { scrollTo(0, scrollY) } }
+    private fun scaleThen(target: Float, then: (Float) -> Unit) {
+        @Suppress("DEPRECATION") val current = scale
+        // WebView rechaza 0.01 exacto; 0.02 sigue llegando a la escala mínima desde cualquier zoom práctico.
+        val factor = if (target <= 0f) 0.02f else (target / current).coerceIn(0.02f, 99f)
+        removeCallbacks(settleScale)
+        pendingScale = then
+        if (target > 0f && kotlin.math.abs(factor - 1f) < 0.01f) { post(settleScale); return }
+        zoomBy(factor)
+        postDelayed(settleScale, 450)
+    }
+    /** Luminancia media (0..1) del contenido bajo cada región, o null si no se pudo muestrear. */
+    fun luminance(regions: List<RectF>): List<Float?> = runCatching {
+        val factor = 0.08f
+        val bitmap = Bitmap.createBitmap((width * factor).toInt().coerceAtLeast(1), (height * factor).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(bitmap); canvas.scale(factor, factor); canvas.translate(-scrollX.toFloat(), -scrollY.toFloat()); draw(canvas)
+            regions.map { region ->
+                var total = 0f; var samples = 0
+                val left = (region.left * factor).toInt().coerceIn(0, bitmap.width - 1); val right = (region.right * factor).toInt().coerceIn(left + 1, bitmap.width)
+                val top = (region.top * factor).toInt().coerceIn(0, bitmap.height - 1); val bottom = (region.bottom * factor).toInt().coerceIn(top + 1, bitmap.height)
+                for (px in left until right) for (py in top until bottom) {
+                    val color = bitmap.getPixel(px, py)
+                    if (Color.alpha(color) < 128) continue
+                    total += (0.2126f * Color.red(color) + 0.7152f * Color.green(color) + 0.0722f * Color.blue(color)) / 255f; samples++
+                }
+                if (samples == 0) null else total / samples
+            }
+        } finally { bitmap.recycle() }
+    }.getOrElse { regions.map { null } }
     fun changeMode(value: String) { mode = value; command("mode", JSONObject().put("mode", value)) }
     fun command(type: String, payload: Any = JSONObject()) {
         evaluateJavascript("window.HyperMarker?.command(${JSONObject.quote(type)},${payload});", null)

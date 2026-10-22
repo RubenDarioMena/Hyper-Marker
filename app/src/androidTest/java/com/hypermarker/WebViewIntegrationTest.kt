@@ -97,7 +97,7 @@ class WebViewIntegrationTest {
     private inline fun Bitmap.useBitmap(block: (Bitmap) -> Unit) { try { block(this) } finally { recycle() } }
 
     @Test fun realLongPressHighlightsSlidesAndCommitsOnRelease() {
-        mode("PIN")
+        mode("EDIT")
         val a = rect("a"); val b = rect("b"); val down = SystemClock.uptimeMillis()
         touch(MotionEvent.ACTION_DOWN, a, down); SystemClock.sleep(650)
         assertEquals("block", decoded("document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('.highlight').style.display"))
@@ -109,12 +109,31 @@ class WebViewIntegrationTest {
         touch(MotionEvent.ACTION_UP, b, down); SystemClock.sleep(250)
         val selected = events.last { it.optString("type") == "target.selected" }
         assertEquals("#b", selected.getJSONObject("payload").getJSONObject("anchor").getString("selector"))
+        assertEquals("block", decoded("document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('.highlight').style.display"))
+        instrument.runOnMainSync { web.command("cancel") }; SystemClock.sleep(100)
         assertEquals("none", decoded("document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('.highlight').style.display"))
         mode("VIEW"); evaluate("document.getElementById('button').click()")
         assertEquals("Funciona", decoded("document.getElementById('button').textContent"))
     }
+    @Test fun viewLongPressSelectsBlockAndZoomFitsThenResets() {
+        val point = rect("button"); val down = SystemClock.uptimeMillis()
+        touch(MotionEvent.ACTION_DOWN, point, down); SystemClock.sleep(650); touch(MotionEvent.ACTION_UP, point, down); SystemClock.sleep(250)
+        assertEquals("Interactuar", decoded("document.getElementById('button').textContent"))
+        val press = events.last { it.optString("type") == "longpress" }.getJSONObject("payload")
+        assertEquals("button", press.getJSONObject("target").getString("tag"))
+        val box = press.getJSONObject("target").getJSONObject("rect")
+        instrument.runOnMainSync { web.command("cancel"); web.zoomToFit(box.getDouble("x"), box.getDouble("y"), box.getDouble("width"), box.getDouble("height")) }
+        SystemClock.sleep(900)
+        assertTrue((decoded("visualViewport.scale") as Number).toDouble() > 1.5)
+        val fits = decoded("(()=>{const r=document.getElementById('button').getBoundingClientRect(),v=visualViewport;return r.left-v.offsetLeft>=-2&&r.right-v.offsetLeft<=v.width+2&&r.top-v.offsetTop>=-2&&r.bottom-v.offsetTop<=v.height+2})()")
+        screenshot("view-zoom-fit")
+        assertEquals(true, fits)
+        instrument.runOnMainSync { web.resetZoom() }
+        SystemClock.sleep(900)
+        assertEquals(1.0, (decoded("visualViewport.scale") as Number).toDouble(), 0.05)
+    }
     @Test fun persistedPinReopensAndMissingTargetIsUnanchored() {
-        mode("PIN"); val down = SystemClock.uptimeMillis(); val a = rect("a")
+        mode("EDIT"); val down = SystemClock.uptimeMillis(); val a = rect("a")
         touch(MotionEvent.ACTION_DOWN, a, down); SystemClock.sleep(650); touch(MotionEvent.ACTION_UP, a, down); SystemClock.sleep(200)
         val data = events.last { it.optString("type") == "target.selected" }.getJSONObject("payload")
         val pin = Annotation(UUID.randomUUID().toString(), document.id, "PIN", data.getString("pageKey"), JSONObject().put("anchor", data.getJSONObject("anchor")).put("title", "Persistente").put("body", "**Nota**").toString())
@@ -134,7 +153,7 @@ class WebViewIntegrationTest {
         repeat(5) { touch(MotionEvent.ACTION_MOVE, start.first + it * 10f to start.second + it * 5f, down) }
         touch(MotionEvent.ACTION_UP, start.first + 60f to start.second + 30f, down); SystemClock.sleep(200)
         assertTrue(events.any { it.optString("type") == "stroke.completed" })
-        mode("PIN"); val surface = rect("canvas"); val next = SystemClock.uptimeMillis()
+        mode("EDIT"); val surface = rect("canvas"); val next = SystemClock.uptimeMillis()
         touch(MotionEvent.ACTION_DOWN, surface, next); SystemClock.sleep(650); touch(MotionEvent.ACTION_UP, surface, next); SystemClock.sleep(200)
         assertEquals("SURFACE", events.last { it.optString("type") == "target.selected" }.getJSONObject("payload").getJSONObject("anchor").getString("strategy"))
     }
@@ -194,7 +213,7 @@ class WebViewIntegrationTest {
         assertFalse(runBlocking { repository.dao.document(document.id)!!.networkAllowed })
     }
     @Test fun pendingLongPressCanBeCancelledAndZoomKeepsOverlayAvailable() {
-        mode("PIN");val a=rect("a");val down=SystemClock.uptimeMillis()
+        mode("EDIT");val a=rect("a");val down=SystemClock.uptimeMillis()
         touch(MotionEvent.ACTION_DOWN,a,down)
         touch(MotionEvent.ACTION_MOVE,a.first+120f to a.second,down)
         SystemClock.sleep(600);touch(MotionEvent.ACTION_UP,a.first+120f to a.second,down)

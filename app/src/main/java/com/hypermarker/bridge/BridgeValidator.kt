@@ -1,5 +1,6 @@
 package com.hypermarker.bridge
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 class BridgeValidator(private val session: String, private val documentId: String, private val revision: Int) {
@@ -19,14 +20,26 @@ class BridgeValidator(private val session: String, private val documentId: Strin
         val payload = message.getJSONObject("payload")
         require(payload.toString().length <= 500_000)
         when (message.getString("type")) {
-            "controller.ready", "anchor.unresolved", "annotation.activated" -> Unit
+            "controller.ready", "anchor.unresolved", "annotation.activated", "tap", "hold" -> Unit
+            "longpress" -> {
+                require(mode == "VIEW" || mode == "DRAW")
+                listOf("x", "y").forEach { key -> require(payload.getDouble(key).isFinite()) }
+                payload.optJSONObject("target")?.let { target ->
+                    require(mode == "VIEW" && target.getString("tag").length <= 40)
+                    val rect = target.getJSONObject("rect")
+                    listOf("x", "y", "width", "height").forEach { key -> require(rect.getDouble(key).isFinite() && rect.getDouble(key) in -10_000_000.0..10_000_000.0) }
+                    require(rect.getDouble("width") > 0 && rect.getDouble("height") > 0)
+                }
+            }
             "target.selected" -> {
-                require(mode == "PIN")
+                require(mode == "EDIT")
                 val anchor = payload.getJSONObject("anchor")
                 require(anchor.getString("strategy") in listOf("DOM", "SURFACE", "PAGE"))
                 require(anchor.optString("selector").length <= 4096)
                 listOf("relativeX", "relativeY").forEach { key -> require(anchor.getDouble(key).isFinite() && anchor.getDouble(key) in 0.0..1.0) }
                 require(anchor.getString("tag").length <= 40 && anchor.optString("text").length <= 160)
+                payload.optJSONObject("text")?.let { text -> listOf("text", "original", "raw").forEach { key -> require(text.optString(key).length <= 20_000) } }
+                listOf("pins", "texts").forEach { key -> payload.optJSONArray(key)?.let { ids -> require(ids.length() <= 10_000 && ids.strings().all { it.length <= 100 }) } }
             }
             "stroke.completed" -> {
                 require(mode == "DRAW")
@@ -46,4 +59,5 @@ class BridgeValidator(private val session: String, private val documentId: Strin
         }
         message
     }.getOrNull()
+    private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 }

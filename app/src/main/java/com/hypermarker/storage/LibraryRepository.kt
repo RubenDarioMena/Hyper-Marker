@@ -136,7 +136,7 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
     suspend fun setNetwork(id: String, allowed: Boolean) = write { dao.put(requireNotNull(dao.document(id)).copy(networkAllowed = allowed)) }
     suspend fun annotations(id: String) = withContext(Dispatchers.IO) { dao.annotations(id) }
     suspend fun replaceAnnotations(id: String, values: List<Annotation>) = write {
-        require(dao.document(id) != null && values.size <= 10_000 && values.map { it.id }.toSet().size == values.size && values.sumOf { it.payload.length.toLong() * 2 } <= 32L * 1024 * 1024 && values.all { it.documentId == id && it.kind in listOf("PIN", "STROKE") && it.payload.length <= 512_000 })
+        require(dao.document(id) != null && values.size <= 10_000 && values.map { it.id }.toSet().size == values.size && values.sumOf { it.payload.length.toLong() * 2 } <= 32L * 1024 * 1024 && values.all { it.documentId == id && it.kind in listOf("PIN", "STROKE", "TEXT") && it.payload.length <= 512_000 })
         database.withTransaction { dao.clearAnnotations(id); dao.putAnnotations(values) }
     }
     suspend fun preference(id: String) = withContext(Dispatchers.IO) { dao.preference(id) ?: ViewerPreference(id) }

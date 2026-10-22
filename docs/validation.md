@@ -90,3 +90,21 @@ Esta copia usa la clave debug generada en cloud, conservada fuera de Git. Su has
 No se ejecutó la matriz manual completa de TalkBack, texto grande, lápiz físico, API 26, otros WebView/OEM, todos los proveedores SAF, revocaciones del sistema, agotamiento real del disco, kill en cada punto de transacción ni muerte forzada del renderer. Recuperación, cancelación y compensaciones tienen código y pruebas acotadas; no se presentan como fault injection exhaustiva. La ventana de autosave y el reflujo de dibujos están documentados.
 
 La entrega acredita la implementación funcional y las suites descritas. La aceptación de uso y las validaciones de hardware/accesibilidad anteriores deben completarse antes de una distribución de producción.
+
+## Rediseño UI/UX del lector y Markdown (2026-10-22)
+
+Entorno: macOS arm64, JDK Homebrew 17.0.20, SDK 36, emulador `flutter_emulator` Android 16 / API 36 con WebView 153.0.8010.36, Chrome de escritorio y Node 22.19.0. Código sin commit sobre `6149943`.
+
+| Comprobación | Resultado | Alcance |
+| --- | --- | --- |
+| `testDebugUnitTest` | **22/22 PASS** | Anteriores más `MarkdownFormatterTest`, `CrossLayoutTest`, tablas en `MarkdownPolicyTest` y nuevos eventos en `BridgeValidatorTest`. |
+| `npm test` (`web/`) | **10/10 PASS** | Toque/pulsación en Ver, selección retenida en Editar, toque y pulsación en Dibujar sin trazo, overrides de texto aplicados/restaurados con nodos originales y pines anclados, comandos de barra en Visual (negrita, lista, título, tabla) y tema oscuro. |
+| `connectedDebugAndroidTest`, emulador | **17/17 PASS** | Incluye el nuevo `viewLongPressSelectsBlockAndZoomFitsThenResets` y el flujo UI con cromo, cruceta → Nota pin, undo/redo, recreación y Markdown Fuente/Visual. |
+| `lintDebug` | **PASS**, 0 errores | 40 advertencias: versiones disponibles y sugerencias KTX/estilo. |
+| `assembleDebug` | **PASS** | APK debug de 23 136 352 bytes; SHA-256 `075df2ef9b73329bbe8eb7029e39ea5b1357fe3c0adc0ebcaef9d74b34630ae1`. No reemplaza el APK de `downloads/`. |
+
+Durante la sesión hubo fallos reales que se corrigieron: `zoomBy(0.01)` es rechazado por WebView (se usa 0.02), un clic suprimido tras una pulsación quedaba retenido al cambiar de modo (se limpia al cancelar) y el flujo UI no encontraba el campo Markdown por un `verticalScroll` externo. Una ejecución posterior falló en 4 casos porque el emulador mostraba un diálogo "Application Not Responding" de `com.android.systemui` que interceptaba los toques inyectados (verificado con `dumpsys window`). Tras reiniciarlo en frío, la suite completa pasó sin cambios de código.
+
+Revisión visual manual en el emulador mediante capturas: cromo de cristal, menú, cruceta en Ver/Editar/Dibujar, Acercar elemento, panel de color, Editar texto y Borrar cambios, y hoja Markdown clara y oscura con negrita sobre selección, viñeta y Título 1 en Visual. No se probaron TalkBack, lápiz físico ni Android 8 para estos cambios.
+
+Instalación en el S24 Ultra (SM-S928U, Android 16): `adb install -r` rechazado con `INSTALL_FAILED_UPDATE_INCOMPATIBLE` por certificado debug distinto del de la instalación existente. Con autorización del propietario: respaldo `run-as` (dos copias idénticas), desinstalación, instalación del APK `075df2ef…` y restauración por `run-as tar`. Verificado: propietario y etiqueta SELinux de app, SHA-256 de los 7 archivos de datos igual al respaldo, esquema Room `a7f7a30c…` sin migración, 3 documentos visibles en RTS auto / Factorio y abiertos (2 HTML interactivos y 1 nota Markdown con el mismo fuente). Sin entradas en el buffer de crash.

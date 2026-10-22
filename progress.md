@@ -1,6 +1,6 @@
 # Progreso y relevo
 
-Última actualización: **2026-10-19** (America/Mexico_City).
+Última actualización: **2026-10-22** (America/Mexico_City).
 
 ## Estado real
 
@@ -41,6 +41,21 @@
 - Markdown no preservable permanece en Source con aviso. Autosave tiene una ventana aproximada de 500 ms; salir guarda explícitamente.
 - No ejecutado: TalkBack completo, lápiz físico, dispositivo API 26, todas las variantes OEM/proveedores SAF y pruebas exhaustivas de falta de espacio/muerte del proceso/renderer. No equivalen a fallos observados ni a casos PASS.
 - Exportación/backup, RAR, sincronización e inspector avanzado quedan fuera de V1. La licencia del código propio y firma/distribución de producción requieren decisión del propietario.
+
+## Rediseño UI/UX del lector y Markdown (2026-10-22)
+
+- Fuente: `main` sincronizado con GitHub (fast-forward a `6149943`), cambios sin commit al cierre de esta sesión.
+- **Autorización explícita del propietario:** rediseño minimalista del visor, cruceta reasignable y "Editar texto". Esta última es un override de V1.1 adelantado por esa solicitud; la reconciliación avanzada de anclas sigue pendiente.
+- Lector: se eliminó el botón flotante. Un toque fuera de contenido interactivo alterna el botón de opciones (arriba a la derecha) y los modos Ver / Editar / Dibujar (abajo) como botones de cristal translúcido con tono adaptado al fondo. En Ver se ocultan solos a los 5 s. Deshacer/Rehacer aparecen junto a opciones en Editar y Dibujar.
+- Cruceta por pulsación prolongada en los tres modos: Ver (Autoscroll, Acercar elemento, Zoom original, Recargar), Editar (Nota pin, Editar texto, Borrar adjuntos, Borrar cambios) y Dibujar (Color, Grosor, Herramienta, Estabilizar, este último aún no disponible). Reasignable desde la cruceta o el menú, persistente en `SharedPreferences`; el resto de acciones quedan en el menú.
+- Editar conserva el gesto obligatorio (resaltado vivo y deslizamiento); al soltar, la selección queda resaltada y aparece la cruceta. "Mode PIN" pasó a llamarse `EDIT` en el protocolo. Nuevos eventos `tap`, `hold` y `longpress`; nuevo tipo de anotación `TEXT` sin cambio de esquema Room.
+- Markdown: hoja blanca u oscura, barra superior monocroma (estilo/tipo de letra, negrita, cursiva, tachado, código, enlace, listas, cita, bloque de código, tabla y separador) que actúa sobre la selección en Fuente y Visual. Las tablas GFM bien formadas ya pueden editarse en Visual. "Source" se rotula "Fuente".
+- Validación con el código final: JVM **22/22**; web **10/10** (7 controlador + 3 editor/React); instrumentadas **17/17** en emulador Android 16 (WebView 153.0.8010.36) tras reinicio en frío; `lintDebug` 0 errores, 40 advertencias; `assembleDebug` PASS. Detalle y fallos ambientales en [docs/validation.md](docs/validation.md).
+- Revisión visual manual en emulador: cromo, menú, cruceta en los tres modos, acercar elemento, panel de color, editar/restaurar texto y hoja Markdown clara/oscura con formato sobre selección.
+- Límites nuevos: sin desenfoque real detrás del cristal (Compose no puede desenfocar el WebView); en Ver la pulsación prolongada reemplaza la selección de texto nativa; la sustitución de texto aplana el formato interno del elemento; Visual normaliza el relleno de tablas y usa `*` en listas.
+- Teléfono S24 Ultra (SM-S928U, Android 16): la instalación existente (1.0.0, 2026-10-20) usaba otro certificado debug y `adb install -r` fue rechazado (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Con autorización explícita del propietario se respaldaron los datos con `run-as` (`artifacts/phone-backup/`, ignorado por Git), se desinstaló, se instaló el APK `075df2ef…` y se restauraron `files/`, `databases/` y `shared_prefs/`. Esquema Room idéntico (`a7f7a30c…`), 7 archivos con SHA-256 igual al respaldo y los 3 documentos (2 HTML y 1 Markdown, en RTS auto / Factorio) abiertos en el teléfono. Las suites instrumentadas no se ejecutaron en el teléfono porque desinstalan la app.
+- Observación en el teléfono: en páginas con su propia barra inferior de navegación, la barra de modos de cristal la cubre mientras está visible (se oculta sola en Ver).
+- Siguiente paso: usar el nuevo flujo con documentos reales en el teléfono; después, commit/push y actualización del APK descargable en `downloads/`.
 
 ## Siguiente paso concreto
 

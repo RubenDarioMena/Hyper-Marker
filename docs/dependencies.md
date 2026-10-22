@@ -17,7 +17,7 @@ La implementación inicial usa un módulo `app`, namespace/applicationId `com.hy
 | AndroidX WebKit | 1.14.0 | AssetLoader, mensajes con origen/frame y controles de service workers. Apache-2.0. |
 | DocumentFile | 1.0.1 | Acceso SAF a árboles. Apache-2.0. |
 | Apache Commons Compress | 1.28.0 | ZIP con atributos Unix, rechazo de symlinks y control de entradas. Apache-2.0 y avisos incluidos. |
-| Milkdown Crepe / utils | 7.22.3 | Editor visual Markdown local basado en ProseMirror. MIT; dependencias transitivas y textos completos en `assets/licenses/WEB.txt`. |
+| Milkdown Crepe / kit / utils | 7.22.3 | Editor visual Markdown local basado en ProseMirror; `kit` aporta los comandos de formato usados por la barra superior. MIT; dependencias transitivas y textos completos en `assets/licenses/WEB.txt`. |
 | esbuild | 0.28.2 | Genera el bundle local del editor. MIT, herramienta de desarrollo. |
 | JUnit / Robolectric | 4.13.2 / 4.14.1 | Tests JVM y Room/JSON Android; EPL-1.0 / MIT, herramientas de prueba. |
 | AndroidX Test runner / ext / rules / UIAutomator | 1.6.2 / 1.2.1 / 1.6.1 / 2.3.0 | Instrumentación en emulador. Apache-2.0, herramientas de prueba. |
