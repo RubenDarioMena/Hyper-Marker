@@ -36,6 +36,8 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
     var cross by mutableStateOf<CrossRequest?>(null)
     var pendingAction by mutableStateOf<ReaderAction?>(null)
     var layout by mutableStateOf(crossStore?.load() ?: CrossLayout.defaults); private set
+    var wheelsEnabled by mutableStateOf(crossStore?.wheelsEnabled() ?: true); private set
+    var pinArmed by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
     var canUndo by mutableStateOf(false); private set
     var canRedo by mutableStateOf(false); private set
@@ -78,6 +80,9 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
         layout = layout + (mode to next); crossStore?.save(mode, next)
     }
     fun resetLayout(mode: String) { val next = CrossLayout.defaults.getValue(mode); layout = layout + (mode to next); crossStore?.save(mode, next) }
+    fun updateWheelsEnabled(enabled: Boolean) {
+        wheelsEnabled = enabled; pinArmed = false; playing = false; cross = null; crossStore?.setWheelsEnabled(enabled)
+    }
     fun jsonAnnotations(): JSONArray = JSONArray().apply {
         annotations.forEach { put(JSONObject().put("id", it.id).put("kind", it.kind).put("pageKey", it.pageKey).put("payload", JSONObject(it.payload))) }
     }
@@ -116,10 +121,11 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
         val page = payload.optString("pageKey").take(4096)
         when (message.getString("type")) {
             "annotation.activated" -> openPin(payload.optString("id"))
-            "longpress" -> if (mode == "VIEW" || mode == "DRAW") cross = CrossRequest(mode, payload, page, x, y)
+            "longpress" -> if (wheelsEnabled && (mode == "VIEW" || mode == "DRAW")) cross = CrossRequest(mode, payload, page, x, y)
             "target.selected" -> {
                 if (mode != "EDIT") return
                 if (reanchoringId != null) openPinEditor(payload, page)
+                else if (!wheelsEnabled && pinArmed) { pinArmed = false; openPinEditor(payload, page) }
                 else { cross = CrossRequest(mode, payload, page, x, y, pendingAction); pendingAction = null }
             }
             "stroke.completed" -> if (mode == "DRAW") update(annotations + Annotation(UUID.randomUUID().toString(), document.id, "STROKE", page, payload.toString()))
@@ -153,7 +159,7 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
     }
     fun retrySave() { error = null; persist(annotations) }
     suspend fun flush(): Boolean { saveJob?.join(); if (!saved) { retrySave(); saveJob?.join() }; return saved }
-    fun network(allowed: Boolean) { playing = false; mode = "VIEW"; viewModelScope.launch { try { repository.setNetwork(document.id, allowed) } catch (e: Exception) { error = e.message } } }
+    fun network(allowed: Boolean) { playing = false; pinArmed = false; mode = "VIEW"; viewModelScope.launch { try { repository.setNetwork(document.id, allowed) } catch (e: Exception) { error = e.message } } }
     fun savePosition(y: Int, zoom: Int, path: String?) {
         preference = ViewerPreference(document.id, zoom, y, speed, direction, path)
         viewModelScope.launch { try { repository.preference(preference) } catch (e: Exception) { error = e.message } }

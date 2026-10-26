@@ -46,6 +46,7 @@ fun ReaderAction.icon(playing: Boolean = false): ImageVector = when (this) {
     ReaderAction.AUTOSCROLL -> if (playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow
     ReaderAction.ZOOM_FIT -> Icons.Outlined.ZoomIn
     ReaderAction.ZOOM_RESET -> Icons.Outlined.ZoomOut
+    ReaderAction.SETTINGS -> Icons.Outlined.Settings
     ReaderAction.RELOAD -> Icons.Outlined.Refresh
     ReaderAction.BACK -> Icons.AutoMirrored.Outlined.ArrowBack
     ReaderAction.FORWARD -> Icons.AutoMirrored.Outlined.ArrowForward
@@ -70,6 +71,16 @@ fun ModeBar(mode: String, tone: GlassTone, annotationsEnabled: Boolean, onMode: 
         listOf(Triple("VIEW", "Ver", Icons.Outlined.Visibility), Triple("EDIT", "Editar", Icons.Outlined.Edit), Triple("DRAW", "Dibujar", Icons.Outlined.Draw)).forEach { (key, label, icon) ->
             GlassButton(icon, "Modo $label", tone, label = label, selected = mode == key, enabled = key == "VIEW" || annotationsEnabled) { onMode(key) }
         }
+    }
+}
+
+@Composable
+fun QuickBar(playing: Boolean, pinArmed: Boolean, drawing: Boolean, tone: GlassTone, annotationsEnabled: Boolean,
+             onAutoscroll: () -> Unit, onPin: () -> Unit, onDraw: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        GlassButton(ReaderAction.AUTOSCROLL.icon(playing), "Autoscroll", tone, label = "Autoscroll", selected = playing, onClick = onAutoscroll)
+        GlassButton(ReaderAction.PIN.icon(), "Poner pin: toca un elemento", tone, label = "Pin", selected = pinArmed, enabled = annotationsEnabled, onClick = onPin)
+        GlassButton(Icons.Outlined.Draw, "Dibujo básico", tone, label = "Dibujar", selected = drawing, enabled = annotationsEnabled, onClick = onDraw)
     }
 }
 

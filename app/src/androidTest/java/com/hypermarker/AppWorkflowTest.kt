@@ -14,6 +14,8 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.*
+import androidx.lifecycle.ViewModelProvider
+import com.hypermarker.library.LibraryViewModel
 import com.hypermarker.storage.*
 import com.hypermarker.viewer.DocumentWebView
 import kotlinx.coroutines.runBlocking
@@ -85,6 +87,61 @@ class AppWorkflowTest {
         }
         val uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values)!!
         context.contentResolver.openOutputStream(uri)!!.use { output -> instrument.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG,100,output) }
+    }
+    @Test fun quickControlsArmPinAndSettingsRestoreWheels() {
+        Assume.assumeTrue(Build.VERSION.SDK_INT >= 29)
+        val preferences = context.getSharedPreferences("reader_cross", android.content.Context.MODE_PRIVATE)
+        val previous = preferences.getBoolean("wheels_enabled", true)
+        preferences.edit().putBoolean("wheels_enabled", true).commit()
+        val title = "Controles rápidos ${SystemClock.uptimeMillis()}"
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, "$title.html"); put(MediaStore.Downloads.MIME_TYPE, "text/html")
+            put(MediaStore.Downloads.RELATIVE_PATH, "Download/HyperMarkerTests")
+        }
+        val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
+            context.contentResolver.openOutputStream(uri)!!.use { it.write("""<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><p id="target" style="margin:120px 20px;padding:40px;background:#dfd">Elemento para pin</p>""".toByteArray()) }
+        val pending = runBlocking { repo.importer.prepare(listOf(uri)) }
+        val document = runBlocking { repo.finishImport(pending, pending.preferred!!, null) }
+        val scenario = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java))
+        try {
+            // Abre directamente el documento para aislar esta prueba del clic en la fila de biblioteca.
+            scenario.onActivity { activity -> ViewModelProvider(activity)[LibraryViewModel::class.java].openedId = document.id }
+            var readerReady = false
+            for (attempt in 0 until 100) {
+                readerReady = runCatching { evaluate(scenario, "document.documentElement.dataset.hypermarkerMode") == "VIEW" }.getOrDefault(false)
+                if (readerReady) break
+                SystemClock.sleep(100)
+            }
+            assertTrue("El lector no abrió el HTML importado", readerReady)
+            openMenu()
+            find(By.text("Ruedas de acceso rápido")).click()
+            find(By.desc("Poner pin: toca un elemento"))
+            assertFalse(device.hasObject(By.desc("Modo Editar")))
+            find(By.desc("Poner pin: toca un elemento")).click()
+            waitFor(scenario, "document.documentElement.dataset.hypermarkerMode", "EDIT")
+            val bounds = org.json.JSONArray(evaluate(scenario, "JSON.stringify((()=>{const r=document.getElementById('target').getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2]})())") as String)
+            var coordinates = 0 to 0
+            scenario.onActivity { activity ->
+                val view = requireNotNull(web(activity.window.decorView))
+                val location = IntArray(2); view.getLocationOnScreen(location)
+                @Suppress("DEPRECATION") val scale = view.scale
+                coordinates = (bounds.getDouble(0) * scale).toInt() + location[0] to (bounds.getDouble(1) * scale).toInt() + location[1]
+            }
+            device.click(coordinates.first, coordinates.second)
+            find(By.text("Nueva nota anclada"))
+            device.pressBack() // Cierra la nota vacía sin guardarla.
+            assertTrue("El editor de pin no se cerró", device.wait(Until.gone(By.text("Nueva nota anclada")), 5_000))
+            assertTrue(runBlocking { repo.annotations(document.id) }.isEmpty())
+            showChrome(); find(By.desc("Opciones del documento")).click()
+            find(By.text("Ruedas de acceso rápido")).click()
+            device.click(device.displayWidth / 16, device.displayHeight / 2) // Cierra el menú tocando fuera de su panel.
+            find(By.desc("Modo Ver"))
+        } finally {
+            scenario.close()
+            runBlocking { repo.delete(document.id, false) }
+            context.contentResolver.delete(uri, null, null)
+            preferences.edit().putBoolean("wheels_enabled", previous).commit()
+        }
     }
     @Test fun markdownKeepsReadingPositionAndRestoresToolsAfterTimeout() {
         val title = "Prueba de posición ${SystemClock.uptimeMillis()}"

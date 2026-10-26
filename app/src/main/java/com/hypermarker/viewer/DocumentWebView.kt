@@ -187,7 +187,10 @@ class DocumentWebView(context: Context, val document: Document, private val repo
             }
         } finally { bitmap.recycle() }
     }.getOrElse { regions.map { null } }
-    fun changeMode(value: String) { mode = value; command("mode", JSONObject().put("mode", value)) }
+    fun changeMode(value: String, accessible: Boolean = false, wheelsEnabled: Boolean = true) {
+        mode = value
+        command("mode", JSONObject().put("mode", value).put("accessible", accessible).put("wheelsEnabled", wheelsEnabled))
+    }
     fun command(type: String, payload: Any = JSONObject()) {
         evaluateJavascript("window.HyperMarker?.command(${JSONObject.quote(type)},${payload});", null)
     }

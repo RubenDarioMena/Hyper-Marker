@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import com.hypermarker.flow.FlowScreen
 import com.hypermarker.library.LibraryScreen
 import com.hypermarker.library.LibraryViewModel
 import com.hypermarker.markdown.MarkdownScreen
@@ -33,6 +34,7 @@ class MainActivity : ComponentActivity() {
                         "HTML" -> ReaderScreen(document, model.repository, onClose = { model.openedId = null },
                             onMarkdown = { model.action { model.openedId = model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id } })
                         "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = { model.openedId = null })
+                        "FLOW" -> FlowScreen(document, model.repository, onClose = { model.openedId = null })
                         else -> LibraryScreen(model)
                     }
                 }

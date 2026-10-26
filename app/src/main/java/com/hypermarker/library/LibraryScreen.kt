@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 
 private data class Item(val id: String, val folder: Boolean, val title: String)
 
+private fun kindLabel(type: String) = when (type) { "HTML" -> "HTML interactivo"; "FLOW" -> "Flow Dots"; else -> "Markdown" }
+private fun kindIcon(type: String) = when (type) { "HTML" -> Icons.Outlined.Code; "FLOW" -> Icons.Outlined.Hub; else -> Icons.Outlined.Description }
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(model: LibraryViewModel) {
@@ -50,7 +53,7 @@ fun LibraryScreen(model: LibraryViewModel) {
             Box {
                 IconButton(onClick = { adding = true }, enabled = !model.busy) { Icon(Icons.Outlined.Add, "Crear o importar") }
                 DropdownMenu(adding, { adding = false }) {
-                    listOf("folder" to "Nueva carpeta", "markdown" to "Nueva nota Markdown").forEach { (action, label) ->
+                    listOf("folder" to "Nueva carpeta", "markdown" to "Nueva nota Markdown", "flow" to "Nuevo Flow").forEach { (action, label) ->
                         DropdownMenuItem(text = { Text(label) }, onClick = { adding = false; operation = action; title = "" })
                     }
                     DropdownMenuItem(text = { Text("Importar HTML, ZIP o Markdown") }, onClick = { adding = false; filePicker.launch(arrayOf("*/*")) })
@@ -82,8 +85,8 @@ fun LibraryScreen(model: LibraryViewModel) {
             } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(entries, key = { it.id }) { item ->
                     ListItem(headlineContent = { Text(item.title) },
-                        supportingContent = { Text(if (item.folder) "Carpeta" else if (documents.first { it.id == item.id }.type == "HTML") "HTML interactivo" else "Markdown") },
-                        leadingContent = { Icon(if (item.folder) Icons.Outlined.Folder else if (documents.first { it.id == item.id }.type == "HTML") Icons.Outlined.Code else Icons.Outlined.Description, null, tint = MaterialTheme.colorScheme.primary) },
+                        supportingContent = { Text(if (item.folder) "Carpeta" else kindLabel(documents.first { it.id == item.id }.type)) },
+                        leadingContent = { Icon(if (item.folder) Icons.Outlined.Folder else kindIcon(documents.first { it.id == item.id }.type), null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = { IconButton(onClick = { selected = item; operation = "menu" }) { Icon(Icons.Outlined.MoreVert, "Acciones de ${item.title}") } },
                         modifier = Modifier.combinedClickable(onClick = { if (item.folder) { model.folderId = item.id; search = "" } else model.openedId = item.id },
                             onLongClick = { selected = item; operation = "menu" }))
@@ -109,13 +112,14 @@ fun LibraryScreen(model: LibraryViewModel) {
                 }) { Text(label) }
             }
         } }, confirmButton = { TextButton(onClick = { operation = null }) { Text("Cerrar") } })
-    if (operation in listOf("folder", "markdown", "rename")) AlertDialog(onDismissRequest = { operation = null }, title = { Text(if (operation == "rename") "Renombrar" else "Crear ${if (operation == "folder") "carpeta" else "nota"}") },
+    if (operation in listOf("folder", "markdown", "flow", "rename")) AlertDialog(onDismissRequest = { operation = null }, title = { Text(when (operation) { "rename" -> "Renombrar"; "folder" -> "Crear carpeta"; "flow" -> "Crear Flow"; else -> "Crear nota" }) },
         text = { OutlinedTextField(title, { title = it }, label = { Text("Nombre") }, singleLine = true) },
         confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
             val action = operation; val item = selected; operation = null
             model.action { when (action) {
                 "folder" -> model.repository.createFolder(model.folderId, title)
                 "markdown" -> { model.openedId = model.repository.createMarkdown(model.folderId, title).id }
+                "flow" -> { model.openedId = model.repository.createFlow(model.folderId, title).id }
                 "rename" -> model.repository.rename(item!!.id, item.folder, title)
             } }
         }) { Text("Guardar") } }, dismissButton = { TextButton(onClick = { operation = null }) { Text("Cancelar") } })

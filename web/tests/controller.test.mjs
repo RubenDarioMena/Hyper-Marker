@@ -45,6 +45,19 @@ test('short tap in Edit toggles chrome without activating content, cancelled ges
  assert.equal(await count(p,'target.selected'),0);
  await mode(p,'VIEW');await p.locator('#button').click();assert.equal(await p.locator('#button').textContent(),'Funciona');await p.close();
 });
+test('without wheels, one tap selects a pin target and long press opens no cross',async()=>{
+ const p=await page();
+ await p.evaluate(()=>HyperMarker.command('mode',{mode:'VIEW',wheelsEnabled:false}));
+ const a=await p.locator('#a').boundingBox();await hold(p,a.x+30,a.y+30);
+ assert.equal(await count(p,'longpress'),0);
+ await p.evaluate(()=>HyperMarker.command('mode',{mode:'EDIT',accessible:true,wheelsEnabled:false}));
+ await p.locator('#button').click();
+ assert.equal((await last(p,'target.selected')).payload.anchor.selector,'#button');
+ assert.equal(await p.locator('#button').textContent(),'Interactuar');
+ await p.evaluate(()=>HyperMarker.command('mode',{mode:'VIEW',wheelsEnabled:false}));
+ await p.locator('#button').click();assert.equal(await p.locator('#button').textContent(),'Funciona');
+ await p.close();
+});
 test('View taps toggle chrome only outside interactive content and long press opens the cross on a block',async()=>{
  const p=await page();
  await p.locator('#button').click();assert.equal(await count(p,'tap'),0);

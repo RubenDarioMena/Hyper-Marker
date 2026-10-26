@@ -11,6 +11,7 @@ app/src/main/java/com/hypermarker/
   storage/                  Room, repositorio y SafeImporter
   viewer/                   WebView, ReaderViewModel, cromo de cristal, cruceta y acciones
   markdown/                 Fuente/Visual, barra de formato, política de round-trip y guardado
+  flow/                     Flow Dots: canvas, gestos, reglas puras del grafo y cámara
   bridge/                   Validación del protocolo de eventos
   security/                 Rutas e invariantes de jerarquía
 app/src/main/assets/
@@ -41,7 +42,7 @@ flowchart TD
 
 ## Datos y persistencia
 
-El esquema Room v1 se exporta en `app/schemas/com.hypermarker.storage.LibraryDatabase/1.json`. No se usa migración destructiva: el próximo cambio de esquema deberá incluir migración explícita.
+Los esquemas Room se exportan en `app/schemas/com.hypermarker.storage.LibraryDatabase/` (v1 y v2). No se usa migración destructiva: `LibraryDatabase.MIGRATION_1_2` crea las tablas de Flow Dots con el SQL del esquema exportado y no toca los datos previos; cada cambio de esquema futuro necesita su propia migración explícita.
 
 | Entidad real | Datos | Invariantes |
 | --- | --- | --- |
@@ -49,6 +50,8 @@ El esquema Room v1 se exporta en `app/schemas/com.hypermarker.storage.LibraryDat
 | Document | id, folderId?, title, type, entryPath?, networkAllowed, revision, createdAt, updatedAt | UUID independiente del nombre; tipo HTML/MARKDOWN; red inicialmente false. |
 | Annotation | id, documentId, kind, pageKey, payload, schemaVersion | PIN/STROKE/TEXT; FK al documento; payload JSON v1 validado y separado del HTML. TEXT guarda ancla, texto original completo y sustitución. |
 | ViewerPreference | documentId, zoom, scrollY, speed, direction, pagePath? | Preferencia por documento, sin reanudar autoscroll por sorpresa. |
+| FlowNode | id, documentId, title, body, x, y, collapsed, createdAt, updatedAt, deletedAt? | Punto de un documento `FLOW`; coordenadas de mundo en dp; título o cuerpo no vacío; borrado lógico (tombstone) para sincronización futura. |
+| FlowEdge | id, documentId, fromId, toId, createdAt, updatedAt, deletedAt? | Conexión dirigida padre → hijo; sin duplicados, autoconexiones ni ciclos (validado en el repositorio). |
 
 Las anclas se embeben en el payload PIN; no hay tabla Anchor separada. El Markdown autoritativo reside en un archivo `.md`, no en una segunda copia editable en Room. Esta concreción mantiene el modelo indicativo del diseño sin duplicar autoridades.
 
@@ -106,9 +109,9 @@ La página puede compartir contexto con el controlador: un sessionId no es auten
 
 ## Interfaz del lector
 
-Sin cromo permanente. Un `tap` muestra u oculta un botón de opciones arriba a la derecha (con Deshacer/Rehacer en Editar y Dibujar) y tres botones de modo abajo: Ver, Editar y Dibujar. En Ver el cromo se oculta tras unos 5 s sin uso. Los botones son "cristal" translúcido: relleno degradado, borde especular y halo. Compose no puede desenfocar el WebView situado debajo, así que no hay desenfoque real; para mantener contraste, `DocumentWebView.luminance` dibuja una copia reducida (8 %) del WebView en software y elige tono claro u oscuro para cada zona.
+Sin cromo permanente. Un `tap` muestra u oculta un botón de opciones arriba a la derecha (con Deshacer/Rehacer en Editar y Dibujar). Con ruedas activas hay tres botones de modo abajo: Ver, Editar y Dibujar. Al desactivarlas desde la primera opción del menú, esos botones se sustituyen por Autoscroll, Pin y Dibujar. Pin queda marcado hasta el siguiente toque de elemento, que abre el editor de nota; Dibujar entra con pluma básica. La preferencia es global y se guarda en `reader_cross`. En Ver el cromo se oculta tras unos 5 s sin uso. Los botones son "cristal" translúcido: relleno degradado, borde gris oscuro semitransparente y halo. Compose no puede desenfocar el WebView situado debajo, así que no hay desenfoque real; para mantener contraste, `DocumentWebView.luminance` dibuja una copia reducida (8 %) del WebView en software y elige tono claro u oscuro para cada zona.
 
-Mantener presionado abre la cruceta de cuatro acciones del modo activo en el punto soltado. `ReaderAction` define el conjunto de acciones por modo; `CrossLayout` asigna cuatro posiciones (arriba, derecha, abajo, izquierda) e intercambia acciones, y `CrossLayoutStore` lo persiste en `SharedPreferences` (`reader_cross`), igual para todos los documentos. Las acciones no asignadas aparecen en el menú con un botón de intercambio; mantener una opción de la cruceta abre su selector. Las acciones de elemento invocadas desde el menú usan la lista accesible de elementos y se ejecutan sobre la selección resultante.
+Con ruedas activas, mantener presionado abre la cruceta de cuatro acciones del modo activo en el punto soltado. `ReaderAction` define el conjunto de acciones por modo; `CrossLayout` asigna cuatro posiciones (arriba, derecha, abajo, izquierda) e intercambia acciones, y `CrossLayoutStore` lo persiste en `SharedPreferences` (`reader_cross`), igual para todos los documentos. En Ver, Configuración ocupa el lugar de Zoom original; las disposiciones guardadas se migran al leerlas y Zoom original permanece en el menú. Las acciones no asignadas aparecen en el menú con un botón de intercambio; mantener una opción de la cruceta abre su selector. Las acciones de elemento invocadas desde el menú usan la lista accesible de elementos y se ejecutan sobre la selección resultante.
 
 `zoomToFit` calcula la escala que encaja el rectángulo completo del bloque (CSS px de documento) en la vista, aplica `zoomBy`, espera a que `onScaleChanged` se estabilice y centra el bloque con `scrollTo`. `resetZoom` aplica el factor mínimo, que WebView limita a la escala original de la página.
 
@@ -131,3 +134,11 @@ Undo/redo nativo conserva snapshots de sesión para creación, borrado, edición
 La pantalla es una hoja blanca, u oscura opcional (`SheetStyleStore`, junto con el tipo de letra Sans/Serif/Mono). Una barra superior monocroma comparte comandos entre modos: en Fuente, `MarkdownFormatter` transforma la selección del `TextFieldValue` (envolver, quitar el formato si ya existe, prefijar líneas, insertar bloques); en Visual se llama a `window.editorCommand`, que ejecuta comandos de Milkdown sobre la selección de ProseMirror. La barra flotante propia de Crepe está desactivada. Fuente usa un editor Compose. Visual usa Milkdown Crepe empaquetado localmente, sin red, CDN, estadísticas ni código HTML importado ejecutable. Cambiar de Visual a Source o salir consulta el Markdown actual antes de guardar. `MarkdownPolicy` protege construcciones no preservables y mantiene su fuente intacta; el subconjunto ordinario y las tablas GFM bien formadas (cabecera, delimitador y columnas consistentes, con contenido de celdas también revisado) sí permiten edición visual real. Visual normaliza el relleno de las tablas y el marcador de lista.
 
 Se confirmaron Kotlin/Compose + Room + archivos privados; módulo único; anclas en JSON v1; Markdown en archivo; host por documento; protocolo acotado; historial de sesión y SDK 26/36. Las versiones están fijadas y sus licencias en el APK. Permanecen decisiones de producto posteriores: licencia del código propio, distribución de producción, V1.1 y exportación/backup. Los overrides de texto se adelantaron de V1.1 por solicitud explícita del propietario; la reconciliación avanzada de anclas sigue pendiente.
+
+## Flow Dots (prototipo F1+F3)
+
+Funcionalidad autorizada aparte de la especificación; decisiones y fases en [docs/proposals/flow-dots.md](docs/proposals/flow-dots.md). `MainActivity` abre `FlowScreen` para documentos `FLOW`. `FlowViewModel` observa puntos y conexiones activos en Room y guarda la cámara como estado de sesión. Las mutaciones pasan por `LibraryRepository` (mismo mutex): crear, editar, mover, plegar, conectar y borrar. Borrar un punto marca con tombstone el punto y sus conexiones en una transacción; duplicar copia el grafo con identidades nuevas; borrar el documento elimina las filas en cascada.
+
+`FlowGraph` contiene la lógica pura: detección de ciclos, nodos ocultos por plegado (alcanzables sólo a través de un nodo plegado; un hijo con otro padre visible sigue visible; ciclos sin raíz llegados de fuera se muestran) y búsqueda del punto más cercano. `FlowCamera` convierte entre pantalla y mundo, hace zoom sobre un punto fijo y encuadra.
+
+Todo se dibuja en un único `Canvas` (rejilla, curvas con flecha, puntos, títulos con `TextMeasurer`), descartando lo que queda fuera de la vista; los títulos se ocultan con zoom menor a 0,45. Gestos, en un solo `awaitEachGesture`: toque en vacío abre el editor de un punto nuevo (sólo se crea al guardar); toque en punto abre la tarjeta provisional; mantener al menos 500 ms (o el timeout largo del sistema) sobre un punto produce háptica y, al soltar sin moverse, pliega/despliega; si se desliza, extiende una conexión que resalta el destino (rojo si es inválido) y al soltar conecta o cancela; arrastrar en vacío desplaza y dos dedos hacen zoom. En Reordenar arrastrar un punto lo mueve y se guarda al soltar. La tarjeta ofrece editar, plegar, «Conectar con…» y quitar conexiones como alternativa sin gesto prolongado. El canvas no expone cada punto a TalkBack todavía.

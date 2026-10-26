@@ -7,6 +7,7 @@ enum class ReaderAction(val label: String, val modes: Set<String>, val target: B
     AUTOSCROLL("Autoscroll", setOf("VIEW")),
     ZOOM_FIT("Acercar elemento", setOf("VIEW"), target = true),
     ZOOM_RESET("Zoom original", setOf("VIEW")),
+    SETTINGS("Configuración", setOf("VIEW")),
     RELOAD("Recargar", setOf("VIEW")),
     BACK("Atrás", setOf("VIEW")),
     FORWARD("Adelante", setOf("VIEW")),
@@ -28,14 +29,15 @@ object CrossLayout {
     val MODES = listOf("VIEW", "EDIT", "DRAW")
     val SLOTS = listOf("Arriba", "Derecha", "Abajo", "Izquierda")
     val defaults = mapOf(
-        "VIEW" to listOf(ReaderAction.AUTOSCROLL, ReaderAction.ZOOM_FIT, ReaderAction.ZOOM_RESET, ReaderAction.RELOAD),
+        "VIEW" to listOf(ReaderAction.AUTOSCROLL, ReaderAction.ZOOM_FIT, ReaderAction.SETTINGS, ReaderAction.RELOAD),
         "EDIT" to listOf(ReaderAction.PIN, ReaderAction.EDIT_TEXT, ReaderAction.DELETE_PINS, ReaderAction.RESTORE_TEXT),
         "DRAW" to listOf(ReaderAction.COLOR, ReaderAction.WIDTH, ReaderAction.TOOL, ReaderAction.STABILIZER),
     )
-    fun pool(mode: String) = ReaderAction.entries.filter { mode in it.modes }
-    fun rest(mode: String, cross: List<ReaderAction>) = pool(mode) - cross.toSet()
+    fun pool(mode: String) = ReaderAction.entries.filter { mode in it.modes && !(mode == "VIEW" && it == ReaderAction.ZOOM_RESET) }
+    fun rest(mode: String, cross: List<ReaderAction>) = (pool(mode) + if (mode == "VIEW") listOf(ReaderAction.ZOOM_RESET) else emptyList()) - cross.toSet()
     fun parse(mode: String, raw: String?): List<ReaderAction> {
         val values = raw?.split(',')?.mapNotNull { name -> ReaderAction.entries.firstOrNull { it.name == name } }
+            ?.map { if (mode == "VIEW" && it == ReaderAction.ZOOM_RESET) ReaderAction.SETTINGS else it }
         return if (values != null && values.size == 4 && values.toSet().size == 4 && values.all { mode in it.modes }) values else defaults.getValue(mode)
     }
     fun format(cross: List<ReaderAction>) = cross.joinToString(",") { it.name }
@@ -54,4 +56,6 @@ class CrossLayoutStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences("reader_cross", Context.MODE_PRIVATE)
     fun load(): Map<String, List<ReaderAction>> = CrossLayout.MODES.associateWith { CrossLayout.parse(it, preferences.getString(it, null)) }
     fun save(mode: String, cross: List<ReaderAction>) { preferences.edit().putString(mode, CrossLayout.format(cross)).apply() }
+    fun wheelsEnabled(): Boolean = preferences.getBoolean("wheels_enabled", true)
+    fun setWheelsEnabled(enabled: Boolean) { preferences.edit().putBoolean("wheels_enabled", enabled).apply() }
 }

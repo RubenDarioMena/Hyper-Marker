@@ -2,7 +2,7 @@
   'use strict';
   if (window.HyperMarker) { window.HyperMarker.destroy(); }
   const state = { mode:'VIEW', annotations:[], config:null, target:null, selected:false, pending:null, active:false, held:false,
-    pointer:null, pointerType:'', start:null, startTime:0, suppressClick:false, tool:'pen', color:'#176b5b', width:3, points:[], accessible:false };
+    pointer:null, pointerType:'', start:null, startTime:0, suppressClick:false, tool:'pen', color:'#176b5b', width:3, points:[], accessible:false, wheelsEnabled:true };
   const host = document.createElement('div');
   host.id = '__hypermarker_overlay';
   host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:layout style;';
@@ -187,6 +187,10 @@
   function hold() {
     clearTimeout(state.pending);state.pending=null;
     if(state.pointer===null)return;
+    if(!state.wheelsEnabled){
+      if(state.mode==='DRAW'){state.active=false;state.points=[];schedule();}
+      return;
+    }
     state.held=true;state.suppressClick=true;
     if(state.mode==='DRAW'){state.active=false;state.points=[];schedule();}
     else{state.active=true;selectAt(state.start[0],state.start[1]);}
@@ -269,7 +273,7 @@
   window.HyperMarker={
     init(config){state.config=config;send('controller.ready');schedule();},
     command(type,payload){
-      if(type==='mode'){cancel();stopAuto();state.mode=payload.mode;state.accessible=!!payload.accessible;document.documentElement.dataset.hypermarkerMode=state.mode;}
+      if(type==='mode'){cancel();stopAuto();state.mode=payload.mode;state.accessible=!!payload.accessible;state.wheelsEnabled=payload.wheelsEnabled!==false;document.documentElement.dataset.hypermarkerMode=state.mode;}
       if(type==='annotations'){state.annotations=payload;lastUnresolved='';}
       if(type==='tool'){state.tool=payload.tool;state.color=payload.color;state.width=payload.width;}
       if(type==='selectTarget'){

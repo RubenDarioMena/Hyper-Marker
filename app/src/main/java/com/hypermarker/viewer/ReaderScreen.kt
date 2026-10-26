@@ -94,10 +94,11 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
     } }
     fun close() { rememberPosition(); scope.launch { if (model.flush()) onClose() } }
     fun dismissCross() { model.cross = null; web?.command("cancel") }
-    fun changeMode(value: String) { model.mode = value; model.reanchoringId = null; model.pendingAction = null; drawPanel = null; menu = false; model.cross = null; chrome = true }
+    fun changeMode(value: String) { model.mode = value; model.pinArmed = false; model.reanchoringId = null; model.pendingAction = null; drawPanel = null; menu = false; model.cross = null; chrome = true }
     fun pickTarget(action: ReaderAction?) {
-        model.pendingAction = action; centerCross = action == null; model.mode = "EDIT"; menu = false
-        web?.changeMode("EDIT")
+        model.pendingAction = action ?: if (!model.wheelsEnabled) ReaderAction.PIN else null
+        centerCross = action == null && model.wheelsEnabled; model.mode = "EDIT"; menu = false
+        web?.changeMode("EDIT", wheelsEnabled = model.wheelsEnabled)
         web?.evaluateJavascript("JSON.stringify(window.HyperMarker?.accessibleTargets()||[])") { value ->
             runCatching { targets = JSONArray(org.json.JSONTokener(value).nextValue() as String) }.onFailure { model.pendingAction = null; model.error = "No se pudieron listar los elementos" }
         }
@@ -115,7 +116,8 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                 model.playing = false; web?.zoomToFit(r.getDouble("x"), r.getDouble("y"), r.getDouble("width"), r.getDouble("height"))
             } ?: run { hint = "No hay un elemento para acercar en ese punto." }
             ReaderAction.ZOOM_RESET -> web?.resetZoom()
-            ReaderAction.RELOAD -> { ready = false; model.mode = "VIEW"; model.playing = false; generation++ }
+            ReaderAction.SETTINGS -> { chrome = true; menu = true }
+            ReaderAction.RELOAD -> { ready = false; model.mode = "VIEW"; model.pinArmed = false; model.playing = false; generation++ }
             ReaderAction.BACK -> if (web?.canGoBack() == true) web?.goBack() else hint = "No hay páginas anteriores."
             ReaderAction.FORWARD -> if (web?.canGoForward() == true) web?.goForward() else hint = "No hay páginas siguientes."
             ReaderAction.FULLSCREEN -> model.fullscreen = !model.fullscreen
@@ -165,7 +167,9 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             else -> close()
         }
     }
-    LaunchedEffect(web, model.mode, ready) { if (ready) { if (model.mode != "VIEW") model.playing = false; web?.changeMode(model.mode) } }
+    LaunchedEffect(web, model.mode, model.pinArmed, model.wheelsEnabled, ready) {
+        if (ready) { if (model.mode != "VIEW") model.playing = false; web?.changeMode(model.mode, accessible = model.pinArmed, wheelsEnabled = model.wheelsEnabled) }
+    }
     LaunchedEffect(web, model.annotations, ready) { if (ready) web?.command("annotations", model.jsonAnnotations()) }
     LaunchedEffect(web, model.tool, model.color, model.width, ready) { if (ready) web?.command("tool", JSONObject().put("tool", model.tool).put("color", model.color).put("width", model.width)) }
     LaunchedEffect(web, model.playing, model.speed, model.direction, ready) { if (ready) web?.command("autoscroll", JSONObject().put("speed", if (model.playing) model.speed * model.direction else 0)) }
@@ -197,10 +201,12 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                             "tap" -> if (model.cross == null) { chrome = !chrome; menu = false; drawPanel = null }
                             "hold" -> web?.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         }
+                        val quickPinSelected = event.optString("type") == "target.selected" && !model.wheelsEnabled && model.pinArmed
                         model.event(event, web?.lastTouchX ?: 0f, web?.lastTouchY ?: 0f)
+                        if (quickPinSelected && model.editor != null) model.mode = "VIEW"
                     }, console = model::log,
                     finished = { view ->
-                        model.mode = "VIEW"; model.playing = false
+                        model.mode = "VIEW"; model.pinArmed = false; model.playing = false
                         if (!view.bridgeAvailable) model.error = "Actualiza Android System WebView para habilitar JavaScript seguro y anotaciones. El HTML estático sigue disponible."
                     }, crashed = { ready = false; model.error = "El visor se cerró. Tus originales y anotaciones guardadas siguen disponibles; vuelve a cargar el documento." }
                 ).also { view ->
@@ -229,9 +235,13 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             }
         }
         AnimatedVisibility(chrome && model.cross == null, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-            ModeBar(model.mode, tones.second, web?.bridgeAvailable == true, ::changeMode, insets.padding(bottom = 16.dp))
+            if (model.wheelsEnabled) ModeBar(model.mode, tones.second, web?.bridgeAvailable == true, ::changeMode, insets.padding(bottom = 16.dp))
+            else QuickBar(model.playing, model.pinArmed, model.mode == "DRAW", tones.second, web?.bridgeAvailable == true,
+                onAutoscroll = { val wasPlaying = model.playing; changeMode("VIEW"); model.playing = !wasPlaying; chrome = !model.playing },
+                onPin = { if (model.pinArmed) changeMode("VIEW") else { changeMode("EDIT"); model.pinArmed = true } },
+                onDraw = { changeMode("DRAW"); model.tool = "pen" }, modifier = insets.padding(bottom = 16.dp))
         }
-        model.cross?.takeIf { it.direct == null }?.let { request ->
+        model.cross?.takeIf { model.wheelsEnabled && it.direct == null }?.let { request ->
             val actions = model.layout.getValue(request.mode)
             CrossMenu(request, actions, crossTone, model.playing, onAction = { perform(it, request) }, onReassign = { reassignSlot = it }, onDismiss = ::dismissCross)
         }
@@ -243,17 +253,24 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
         if (menu) MenuPanel(tones.first, onDismiss = { menu = false }) {
             val tone = tones.first
             Text(document.title, color = tone.content, style = MaterialTheme.typography.titleMedium, maxLines = 2, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
+            MenuRow(Icons.Outlined.Gamepad, "Ruedas de acceso rápido", tone,
+                supporting = if (model.wheelsEnabled) "Mantener pulsado abre la cruceta" else "Accesos directos: Autoscroll, Pin y Dibujar",
+                trailing = { Switch(model.wheelsEnabled, { enabled -> model.updateWheelsEnabled(enabled); if (!enabled) changeMode("VIEW"); web?.command("cancel") },
+                    colors = SwitchDefaults.colors(checkedTrackColor = tone.content, checkedThumbColor = if (tone == GlassTone.LIGHT) Color.White else Color.Black,
+                        uncheckedThumbColor = tone.muted, uncheckedTrackColor = Color.Transparent, uncheckedBorderColor = tone.muted)) }) {
+                val enabled = !model.wheelsEnabled; model.updateWheelsEnabled(enabled); if (!enabled) changeMode("VIEW"); web?.command("cancel")
+            }
             Text(if (document.networkAllowed) "Recursos HTTPS permitidos" else "Sin acceso a red · archivos locales", color = tone.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp))
             val cross = model.layout.getValue(model.mode)
             MenuHeader("Más acciones · ${MODE_LABELS[model.mode]}", tone)
-            CrossLayout.rest(model.mode, cross).forEach { action ->
+            (if (model.wheelsEnabled) CrossLayout.rest(model.mode, cross) else CrossLayout.rest(model.mode, emptyList())).filterNot { it == ReaderAction.SETTINGS }.forEach { action ->
                 MenuRow(action.icon(model.playing), action.label, tone,
                     supporting = when { !action.available -> "Próximamente"; action == ReaderAction.ZOOM_FIT -> "Mantén presionado un elemento"; action.target -> "Elegir elemento de una lista"; else -> null },
                     enabled = action.available && action != ReaderAction.ZOOM_FIT,
-                    trailing = { IconButton(onClick = { swapAction = action }) { Icon(Icons.Outlined.SwapHoriz, "Mover ${action.label} a la cruceta", tint = tone.content) } }) { menu = false; perform(action, null) }
+                    trailing = if (model.wheelsEnabled && action != ReaderAction.ZOOM_RESET) ({ IconButton(onClick = { swapAction = action }) { Icon(Icons.Outlined.SwapHoriz, "Mover ${action.label} a la cruceta", tint = tone.content) } }) else null) { menu = false; perform(action, null) }
             }
-            MenuRow(Icons.Outlined.Tune, "Personalizar cruceta", tone, supporting = cross.joinToString(" · ") { it.label }) { menu = false; customize = true }
-            if (model.mode == "EDIT") MenuRow(Icons.Outlined.Accessibility, "Elegir elemento sin mantener", tone, supporting = "Abre la cruceta para un elemento de la lista") { pickTarget(null) }
+            if (model.wheelsEnabled) MenuRow(Icons.Outlined.Tune, "Personalizar cruceta", tone, supporting = cross.joinToString(" · ") { it.label }) { menu = false; customize = true }
+            if (model.mode == "EDIT") MenuRow(Icons.Outlined.Accessibility, "Elegir elemento sin mantener", tone, supporting = if (model.wheelsEnabled) "Abre la cruceta para un elemento de la lista" else "Abre el editor de pin para un elemento de la lista") { pickTarget(null) }
             if (model.mode == "DRAW") MenuRow(toolIcon(model.tool), "Herramienta: ${DRAW_TOOLS.first { it.first == model.tool }.second}", tone) { menu = false; drawPanel = ReaderAction.TOOL }
             if (model.mode == "VIEW") {
                 MenuHeader("Autoscroll", tone)
@@ -268,7 +285,8 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             MenuRow(Icons.Outlined.EditNote, "Crear nota Markdown", tone) { menu = false; rememberPosition(); scope.launch { if (model.flush()) onMarkdown() } }
             MenuRow(Icons.Outlined.Language, "Permitir recursos HTTPS", tone, trailing = { Switch(document.networkAllowed, { ready = false; model.network(it) }, colors = SwitchDefaults.colors(checkedTrackColor = tone.content, checkedThumbColor = if (tone == GlassTone.LIGHT) Color.White else Color.Black, uncheckedThumbColor = tone.muted, uncheckedTrackColor = Color.Transparent, uncheckedBorderColor = tone.muted)) }) { ready = false; model.network(!document.networkAllowed) }
             MenuRow(Icons.AutoMirrored.Outlined.LibraryBooks, "Volver a la biblioteca", tone) { menu = false; close() }
-            Text("Toca la página para mostrar u ocultar los controles. Mantén presionado para abrir la cruceta; mantén una opción para reasignarla. Los dibujos siguen coordenadas de página y pueden desalinearse si el texto se reacomoda.",
+            Text((if (model.wheelsEnabled) "Toca la página para mostrar u ocultar los controles. Mantén presionado para abrir la cruceta; mantén una opción para reasignarla. "
+                else "Toca Pin y después un elemento de la página para crear una nota. ") + "Los dibujos siguen coordenadas de página y pueden desalinearse si el texto se reacomoda.",
                 color = tone.muted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
         }
         hint?.let { message ->

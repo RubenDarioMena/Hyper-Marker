@@ -68,6 +68,7 @@ No almacenar bombas ZIP reales de gran tamaño: generar casos acotados usando l�
 | UI-02 | Mantener presionado en Ver, Editar y Dibujar. | Cruceta de cuatro acciones del modo en el punto soltado; en Ver/Editar el elemento queda resaltado; el clic del contenido no se activa. |
 | UI-03 | Reasignar desde la cruceta y desde el menú; cerrar y reabrir. | Intercambio sin duplicados, acción desplazada visible en el menú y persistencia entre documentos. |
 | UI-04 | Acercar elemento y Zoom original. | El bloque completo cabe y queda centrado; la vuelta restablece la escala inicial. |
+| UI-05 | Desactivar ruedas desde la primera opción bajo el título del documento; tocar Pin y un elemento; entrar a Dibujar; volver a activar ruedas; mantener en Ver. | La preferencia persiste, la barra muestra Autoscroll/Pin/Dibujar sin botones de modo, Pin permanece marcado hasta seleccionar y abre el editor sin activar el HTML; Dibujar usa pluma; la rueda Ver abre Configuración en vez de Zoom original. |
 | TXT-01 | Editar texto de un elemento, recargar, restaurar y deshacer. | Override separado, reaplicado sólo si el original coincide, restauración de los nodos originales; inputs/superficies no editables; pines del elemento siguen anclados. |
 | MD-05 | Seleccionar texto en Fuente y Visual y aplicar estilo, tipo de letra, listas, cita, código, enlace, tabla y separador; alternar hoja oscura. | El formato se aplica a la selección (o al cursor) y repetirlo lo retira; tablas GFM bien formadas se editan en Visual; tema y letra persisten. |
 | MD-06 | Desplazar una nota larga en Fuente y Visual, alternar ambos modos; esperar 5 s sin tocar y recuperar la barra. | La posición proporcional de lectura se conserva en ambos sentidos; la barra se oculta y reaparece al tocar la hoja o «Mostrar herramientas». Con exploración táctil no se oculta automáticamente. |
@@ -78,6 +79,21 @@ No almacenar bombas ZIP reales de gran tamaño: generar casos acotados usando l�
 | SEC-05 | Enviar mensajes falsos, enormes, de subframes, fuera de modo o sesiones viejas. | Sin privilegios ni cambios a otros documentos; rechazo acotado, biblioteca estable. |
 | A11Y-01 | TalkBack, texto grande, contraste, navegación del sistema, dedo/lápiz. | Controles identificables/utilizables; alternativa sin gesto prolongado; registrar hardware no probado. |
 | BUILD-01 | Compilar checkout limpio e instalar APK debug. | Comando reproducible, archivo instalable y apertura real; registrar hash/commit/entorno. |
+
+## Flow Dots (prototipo)
+
+Funcionalidad fuera de V1 ([propuesta](proposals/flow-dots.md)). Estos casos no forman parte de la aceptación V1.
+
+| ID | Acción | Resultado obligatorio |
+| --- | --- | --- |
+| FLOW-01 | Crear un Flow en la biblioteca; renombrar, mover, duplicar y borrar. | Tipo `FLOW` con icono propio; la copia tiene identidades nuevas e independientes; borrar elimina puntos y conexiones. |
+| FLOW-02 | Tocar el vacío, cancelar; tocar de nuevo y guardar con título. | Cancelar o guardar vacío no crea nada; guardar crea el punto en esa posición y persiste tras cerrar/reabrir. |
+| FLOW-03 | Mantener sobre un punto y deslizar hasta otro; soltar. | Háptica al activarse, línea elástica, destino resaltado, conexión padre → hijo creada. |
+| FLOW-04 | Intentar conectar hijo → antepasado; soltar en vacío. | Destino en rojo y aviso de ciclo sin crear nada; en vacío se cancela. |
+| FLOW-05 | Mantener y soltar sin mover sobre un padre; repetir. | Oculta los descendientes sin otra ruta visible y muestra «+N»; repetir los restaura. |
+| FLOW-06 | Reordenar: arrastrar un punto, Listo, reabrir. | Posición nueva persistida; crear/conectar/plegar suspendidos mientras dura. |
+| FLOW-07 | Desplazar con un dedo, zoom con dos, Encuadrar. | El zoom mantiene el punto bajo los dedos; Encuadrar muestra todos los puntos visibles. |
+| FLOW-08 | Abrir una base v1 con datos y actualizar a v2. | La migración conserva documentos y anotaciones y Room valida el esquema. |
 
 ## Comandos previstos
 

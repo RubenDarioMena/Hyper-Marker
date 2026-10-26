@@ -71,8 +71,8 @@ fun Modifier.glass(shape: Shape, tone: GlassTone, selected: Boolean = false, sol
                 center = Offset(size.width * .28f, 0f), radius = size.maxDimension * .75f))
             drawContent()
         }
-        .border(if (selected) 1.5.dp else 1.dp, if (selected) SolidColor(tone.content.copy(alpha = .7f))
-            else Brush.linearGradient(listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .12f), Color.White.copy(alpha = .5f))), shape)
+        .border(if (selected) 1.5.dp else 1.dp, if (selected) SolidColor(tone.content.copy(alpha = .78f))
+            else SolidColor(Color(0xFF303036).copy(alpha = .48f)), shape)
 }
 
 @OptIn(ExperimentalFoundationApi::class)

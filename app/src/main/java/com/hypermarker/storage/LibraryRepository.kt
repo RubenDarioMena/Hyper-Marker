@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.AtomicFile
 import androidx.room.Room
 import androidx.room.withTransaction
+import com.hypermarker.flow.FlowGraph
 import com.hypermarker.security.FolderRules
 import com.hypermarker.security.PathGuard
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,8 @@ import java.io.File
 import java.util.UUID
 
 class LibraryRepository(val context: Context, database: LibraryDatabase? = null) {
-    val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db").build()
+    val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
+        .addMigrations(LibraryDatabase.MIGRATION_1_2).build()
     val dao = this.database.dao()
     private val mutex = Mutex()
     private var recovered = false
@@ -116,6 +118,10 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
             require(directory(doc.id).copyRecursively(directory(next), overwrite = false)) { "No se pudo copiar el documento" }
             dao.put(doc.copy(id = next, folderId = parent, networkAllowed = false, title = doc.title.take(192) + " (copia)", createdAt = System.currentTimeMillis()))
             dao.putAnnotations(dao.annotations(doc.id).map { it.copy(id = id(), documentId = next) })
+            val nodes = dao.flowNodes(doc.id).associate { it.id to id() }
+            dao.putFlowNodes(dao.flowNodes(doc.id).map { it.copy(id = nodes.getValue(it.id), documentId = next) })
+            dao.putFlowEdges(dao.flowEdges(doc.id).filter { it.fromId in nodes && it.toId in nodes }
+                .map { it.copy(id = id(), documentId = next, fromId = nodes.getValue(it.fromId), toId = nodes.getValue(it.toId)) })
         }
         try {
             database.withTransaction {
@@ -141,6 +147,56 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
     }
     suspend fun preference(id: String) = withContext(Dispatchers.IO) { dao.preference(id) ?: ViewerPreference(id) }
     suspend fun preference(value: ViewerPreference) = write { if (dao.document(value.documentId) != null) dao.put(value) }
+    suspend fun createFlow(parent: String?, title: String): Document = write {
+        checkParent(parent)
+        val document = Document(id(), parent, name(title), "FLOW")
+        try { require(directory(document.id).mkdirs()) { "No se pudo crear el documento" }; dao.put(document); document }
+        catch (error: Throwable) { directory(document.id).deleteRecursively(); throw error }
+    }
+    private suspend fun flowDocument(id: String) = requireNotNull(dao.document(id)?.takeIf { it.type == "FLOW" }) { "El Flow ya no existe" }
+    private suspend fun flowNode(document: String, node: String) =
+        requireNotNull(dao.flowNodes(document).firstOrNull { it.id == node }) { "El punto ya no existe" }
+    private fun noteText(title: String, body: String) {
+        require(title.length <= 200 && body.length <= 256_000) { "El título admite 200 caracteres y el cuerpo 256 000" }
+        require(title.isNotBlank() || body.isNotBlank()) { "Escribe un título o un texto" }
+    }
+    private fun coordinate(value: Float) = value.also { require(it.isFinite() && kotlin.math.abs(it) <= 1_000_000f) { "Posición fuera del canvas" } }
+    suspend fun createFlowNode(document: String, x: Float, y: Float, title: String, body: String): FlowNode = write {
+        flowDocument(document); noteText(title, body)
+        require(dao.flowNodes(document).size < 5_000) { "El Flow admite hasta 5000 puntos" }
+        FlowNode(id(), document, title.trim(), body, coordinate(x), coordinate(y)).also { dao.put(it) }
+    }
+    suspend fun updateFlowNode(document: String, node: String, title: String, body: String) = write {
+        noteText(title, body)
+        dao.put(flowNode(document, node).copy(title = title.trim(), body = body, updatedAt = System.currentTimeMillis()))
+    }
+    suspend fun moveFlowNode(document: String, node: String, x: Float, y: Float) = write {
+        dao.put(flowNode(document, node).copy(x = coordinate(x), y = coordinate(y), updatedAt = System.currentTimeMillis()))
+    }
+    suspend fun setFlowCollapsed(document: String, node: String, collapsed: Boolean) = write {
+        dao.put(flowNode(document, node).copy(collapsed = collapsed, updatedAt = System.currentTimeMillis()))
+    }
+    /** Conecta `from` (padre) con `to`. Rechaza autoconexiones, duplicados y ciclos. */
+    suspend fun connectFlowNodes(document: String, from: String, to: String): FlowEdge = write {
+        flowNode(document, from); flowNode(document, to)
+        val edges = dao.flowEdges(document)
+        require(edges.none { it.fromId == from && it.toId == to }) { "Esos puntos ya están conectados" }
+        require(!FlowGraph.wouldCreateCycle(edges.map { it.fromId to it.toId }, from, to)) { "La conexión crearía un ciclo" }
+        require(edges.size < 20_000) { "El Flow admite hasta 20000 conexiones" }
+        FlowEdge(id(), document, from, to).also { dao.put(it) }
+    }
+    suspend fun deleteFlowEdge(document: String, edge: String) = write {
+        val value = requireNotNull(dao.flowEdges(document).firstOrNull { it.id == edge }) { "La conexión ya no existe" }
+        val now = System.currentTimeMillis(); dao.put(value.copy(deletedAt = now, updatedAt = now))
+    }
+    /** Marca el punto y sus conexiones como borrados (tombstones), en una transacción. */
+    suspend fun deleteFlowNode(document: String, node: String) = write {
+        val value = flowNode(document, node); val now = System.currentTimeMillis()
+        database.withTransaction {
+            dao.put(value.copy(deletedAt = now, updatedAt = now))
+            dao.putFlowEdges(dao.flowEdges(document).filter { it.fromId == node || it.toId == node }.map { it.copy(deletedAt = now, updatedAt = now) })
+        }
+    }
     suspend fun installSample(): Document = withContext(Dispatchers.IO) {
         val next = id(); val operation = File(context.filesDir, "imports/$next").apply { mkdirs() }
         val root = File(operation, "original").apply { mkdirs() }
