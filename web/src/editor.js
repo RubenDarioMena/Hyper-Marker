@@ -23,6 +23,19 @@ window.startEditor = async (source, sessionId) => {
     send('loaded', {});
   } catch(error) { document.getElementById('error').textContent=String(error);send('error',{message:String(error)}); }
 };
+const scrollFraction = () => {
+  const root = document.scrollingElement || document.documentElement;
+  const range = Math.max(0, root.scrollHeight - root.clientHeight);
+  return range ? Math.min(1, Math.max(0, root.scrollTop / range)) : 0;
+};
+window.editorSnapshot = () => JSON.stringify({source:crepe?.getMarkdown() ?? '', fraction:scrollFraction()});
+window.editorSetScrollFraction = fraction => {
+  const value = Math.min(1, Math.max(0, Number(fraction) || 0));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const root = document.scrollingElement || document.documentElement;
+    root.scrollTop = value * Math.max(0, root.scrollHeight - root.clientHeight);
+  }));
+};
 const depth = (state, name) => { const {$from} = state.selection; for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === name) return d; return -1; };
 const heading = state => { const {$from} = state.selection; return $from.parent.type.name === 'heading' ? $from.parent.attrs.level : 0; };
 function toggleList(ctx, view, name, wrap) {

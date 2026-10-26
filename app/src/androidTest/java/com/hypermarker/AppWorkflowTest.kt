@@ -86,6 +86,36 @@ class AppWorkflowTest {
         val uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values)!!
         context.contentResolver.openOutputStream(uri)!!.use { output -> instrument.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG,100,output) }
     }
+    @Test fun markdownKeepsReadingPositionAndRestoresToolsAfterTimeout() {
+        val title = "Prueba de posición ${SystemClock.uptimeMillis()}"
+        val source = (0 until 80).joinToString("\n\n") { "## Sección $it\n\nTexto de la sección $it." } + "\n"
+        val document = runBlocking { repo.createMarkdown(null, title, source) }
+        val scenario = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java))
+        try {
+            find(By.clazz("android.widget.EditText")).text = title
+            find(By.text(title)).click()
+            assertTrue(device.wait(Until.hasObject(By.desc("Mostrar herramientas")), 7_000))
+            assertFalse(device.hasObject(By.text("Fuente")))
+            find(By.desc("Mostrar herramientas")).click()
+            find(By.text("Visual")).click()
+            waitFor(scenario, "typeof window.editorSnapshot", "function")
+            evaluate(scenario, "window.editorSetScrollFraction(.7)")
+            SystemClock.sleep(300)
+            val before = org.json.JSONObject(evaluate(scenario, "window.editorSnapshot()") as String).getDouble("fraction")
+            assertTrue("Posición visual inicial: $before", before in 0.5..0.9)
+            device.findObject(By.desc("Mostrar herramientas"))?.click()
+            find(By.text("Fuente")).click()
+            device.findObject(By.desc("Mostrar herramientas"))?.click()
+            find(By.text("Visual")).click()
+            waitFor(scenario, "typeof window.editorSnapshot", "function")
+            SystemClock.sleep(300)
+            val fraction = org.json.JSONObject(evaluate(scenario, "window.editorSnapshot()") as String).getDouble("fraction")
+            assertTrue("Posición restaurada: $fraction", fraction in 0.5..0.9)
+        } finally {
+            scenario.close()
+            runBlocking { repo.delete(document.id, false) }
+        }
+    }
     @Test fun sharePinSaveCancelUndoAndVisualMarkdownSurviveRecreation() {
         Assume.assumeTrue(Build.VERSION.SDK_INT >= 29)
         runBlocking { repo.recover() }
@@ -99,7 +129,7 @@ class AppWorkflowTest {
         val intent = Intent(context, MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/html").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val scenario = ActivityScenario.launch<MainActivity>(intent)
         try {
-            find(By.desc("Opciones del documento"))
+            showChrome()
             device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)(Got it|Entendido|Aceptar)"))), 2000)?.click()
             assertFalse(device.hasObject(By.desc("Herramientas del documento")))
             showChrome()

@@ -78,8 +78,10 @@ private val TOOLS: List<Triple<FormatCommand, ImageVector, String>> = listOf(
 )
 
 @Composable
-fun MarkdownToolbar(colors: SheetColors, font: String, enabled: Boolean, onFont: (String) -> Unit, onCommand: (FormatCommand) -> Unit) {
+fun MarkdownToolbar(colors: SheetColors, font: String, enabled: Boolean, onFont: (String) -> Unit, onCommand: (FormatCommand) -> Unit,
+                    onMenuExpandedChange: (Boolean) -> Unit = {}) {
     var styles by remember { mutableStateOf(false) }
+    LaunchedEffect(styles) { onMenuExpandedChange(styles) }
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box {
             TextButton(onClick = { styles = true }, enabled = enabled, colors = ButtonDefaults.textButtonColors(contentColor = colors.content)) {

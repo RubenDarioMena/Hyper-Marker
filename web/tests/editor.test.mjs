@@ -43,6 +43,23 @@ test('toolbar commands format the current selection, insert tables and switch th
  assert.equal(await page.evaluate(()=>document.documentElement.dataset.font),'serif');
  }finally{await browser.close();await new Promise(done=>server.close(done));}
 });
+test('editor snapshot restores the same relative reading position',async()=>{
+ const root=resolve('../app/src/main/assets/editor');
+ const server=createServer(async(req,res)=>{try{const file=resolve(root,'.'+req.url);if(!file.startsWith(root+'/'))throw Error();const body=await readFile(file);res.setHeader('Content-Type',({'.js':'application/javascript','.css':'text/css','.html':'text/html'})[extname(file)]||'text/plain');res.end(body);}catch{res.statusCode=404;res.end();}});
+ await new Promise(done=>server.listen(0,'127.0.0.1',done));
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':chromium.executablePath()),headless:true});
+ try{const page=await browser.newPage({viewport:{width:390,height:640}});
+ await page.addInitScript(()=>{window.events=[];window.MarkdownBridge={postMessage:value=>events.push(JSON.parse(value))};});await page.goto('http://127.0.0.1:'+server.address().port+'/index.html');
+ const source=Array.from({length:80},(_,i)=>`## Sección ${i}\n\nContenido de la sección ${i}.`).join('\n\n');
+ await page.evaluate(value=>startEditor(value,'test'),source);
+ for(let i=0;i<50&&!await page.evaluate(()=>events.some(e=>e.type==='loaded'));i++)await new Promise(r=>setTimeout(r,50));
+ await page.evaluate(()=>editorSetScrollFraction(.6));await page.waitForTimeout(100);
+ const snapshot=JSON.parse(await page.evaluate(()=>editorSnapshot()));
+ assert.equal(snapshot.source.trimEnd(),source);assert.ok(Math.abs(snapshot.fraction-.6)<.03,snapshot.fraction);
+ await page.evaluate(()=>editorSetScrollFraction(0));await page.waitForTimeout(100);
+ assert.ok(JSON.parse(await page.evaluate(()=>editorSnapshot())).fraction<.01);
+ }finally{await browser.close();await new Promise(done=>server.close(done));}
+});
 test('compiled React fixture resolves relative assets and remains interactive',async()=>{
  const root=resolve('../fixtures/react-built');
  const server=createServer(async(req,res)=>{try{const relative=req.url.replace(/^\/nested\//,'');const file=resolve(root,relative);if(!file.startsWith(root+'/'))throw Error();res.setHeader('Content-Type',({'.js':'application/javascript','.css':'text/css','.html':'text/html'})[extname(file)]||'text/plain');res.end(await readFile(file));}catch{res.statusCode=404;res.end();}});

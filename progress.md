@@ -1,6 +1,6 @@
 # Progreso y relevo
 
-Última actualización: **2026-10-22** (America/Mexico_City).
+Última actualización: **2026-10-26** (America/Mexico_City).
 
 ## Estado real
 
@@ -70,6 +70,16 @@ Descargar el [APK debug versionado](downloads/README.md), usarlo con documentos 
 - Por solicitud explícita del propietario, se agrega `downloads/Hyper-Marker-1.0.0-debug.apk` a Git con una excepción específica en `.gitignore`, su SHA-256 y el [registro de entrega](downloads/README.md). Las claves privadas y otras salidas siguen fuera de Git.
 - Esta compilación usa su propio certificado debug; no promete actualizar instalaciones firmadas en otro entorno. No se ejecutaron pruebas instrumentadas ni instalación/arranque en dispositivo en esta sesión cloud. Las pruebas Android de la entrega original siguen documentadas por separado.
 - Siguiente paso: descargar el APK desde GitHub y realizar pruebas de uso en el teléfono, conservando cualquier instalación con datos importantes ante una incompatibilidad de firma.
+
+## Continuidad Fuente/Visual y barra Markdown (2026-10-26)
+
+- Estado Git al iniciar: `main` y `origin/main` coincidían en `56ee1a7`; árbol de trabajo limpio tras `git fetch origin`. No hubo divergencia que requiriese pull o merge.
+- El editor Fuente usa `TextFieldState` con `ScrollState` expuesto; al pasar a Visual se aplica su fracción vertical. Visual entrega Markdown y fracción de desplazamiento en una sola captura al volver a Fuente. También sitúa el cursor cerca de esa fracción, y conserva el último valor Visual hasta que el usuario interactúe con Fuente. La correspondencia es proporcional: la altura de bloques y el ajuste de líneas pueden diferir entre modos, por lo que no se promete la misma línea exacta.
+- Cabecera, selector de modo y barra de formato de Markdown se ocultan tras 5 s sin interacción. Un botón accesible «Mostrar herramientas» los restaura; tocar la hoja también los muestra. El temporizador espera mientras se mantiene el dedo, mientras el menú de estilos está abierto y se desactiva con exploración táctil. La preferencia de 5 s sigue el valor por defecto de los controles de [Android Media3](https://developer.android.com/reference/androidx/media3/ui/PlayerControlView); no se encontró un estándar universal de 4 s para editores.
+- El HTML original y los archivos Markdown autoritativos siguen separados de anotaciones. No se cambió el esquema ni la política de red.
+- Idiomas: **evaluación, sin selector implementado todavía**. El proyecto carece de `strings.xml` y hay aproximadamente 169 líneas con `Text`, descripciones, etiquetas o menús en los 21 archivos Kotlin. La migración inicial consiste en extraer textos de UI y errores a recursos, agregar español e inglés, revisar plurales/longitudes, configurar idiomas por app en Android 13+ y un selector compatible con API 26–32. La guía oficial describe [`stringResource`](https://developer.android.com/guide/topics/resources/localization) y [preferencias de idioma por app](https://developer.android.com/guide/topics/resources/app-languages). Estimación preliminar: **2–3 días de trabajo** para español/inglés, selector y QA en dos versiones Android; después **0,5–1,5 días por idioma** con traducción revisada. No traduce automáticamente el contenido importado ni las notas del usuario.
+- Validación: `npm run build` PASS; pruebas web **11/11 PASS** (incluida captura/restauración de posición); `testDebugUnitTest` **22/22 PASS**, `assembleDebug` y `lintDebug` PASS con JBR de Android Studio y SDK local. Una suite instrumentada previa al último ajuste ejecutó **17 casos, 15 PASS y 2 FAIL**: `AppWorkflowTest` buscó el cromo del lector después de su ocultación automática; `WebViewIntegrationTest.autoscrollPausesOnTouchAndSupportsReverseDirection` falló en el emulador. El primero se ajustó en la prueba; el segundo sigue sin resolverse ni atribuirse a este cambio. Dos ejecuciones aisladas de MD-06 detectaron inicialmente una vuelta al 0 % y motivaron el cambio a `TextFieldState` y el respaldo de posición. La ejecución instrumentada del código final **no está verificada**: el emulador de 2 GiB sufrió presión de memoria, reportó timeouts de `adb` y cerró el proceso de instrumentación antes de ejecutar MD-06, incluso tras reiniciarlo. No se registra MD-06 como PASS.
+- Siguiente paso concreto: ejecutar MD-06 en un emulador/dispositivo con memoria suficiente y corregir cualquier discrepancia visual que aparezca. Repetir el caso de autoscroll en un entorno estable antes de atribuirle un fallo funcional. La internacionalización queda pendiente de implementación.
 
 ## Registro para futuras sesiones
 

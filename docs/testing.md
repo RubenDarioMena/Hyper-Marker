@@ -70,6 +70,7 @@ No almacenar bombas ZIP reales de gran tamaño: generar casos acotados usando l�
 | UI-04 | Acercar elemento y Zoom original. | El bloque completo cabe y queda centrado; la vuelta restablece la escala inicial. |
 | TXT-01 | Editar texto de un elemento, recargar, restaurar y deshacer. | Override separado, reaplicado sólo si el original coincide, restauración de los nodos originales; inputs/superficies no editables; pines del elemento siguen anclados. |
 | MD-05 | Seleccionar texto en Fuente y Visual y aplicar estilo, tipo de letra, listas, cita, código, enlace, tabla y separador; alternar hoja oscura. | El formato se aplica a la selección (o al cursor) y repetirlo lo retira; tablas GFM bien formadas se editan en Visual; tema y letra persisten. |
+| MD-06 | Desplazar una nota larga en Fuente y Visual, alternar ambos modos; esperar 5 s sin tocar y recuperar la barra. | La posición proporcional de lectura se conserva en ambos sentidos; la barra se oculta y reaparece al tocar la hoja o «Mostrar herramientas». Con exploración táctil no se oculta automáticamente. |
 | SEC-01 | Pedir rutas fuera del proyecto, codificadas y de otro documento. | Rechazo sin lectura ni fallback de red/filesystem. |
 | SEC-02 | Abrir documento OFFLINE con recursos locales y remotos. | Local funciona sin conexión; no salen solicitudes remotas por canales probados, incluidos sockets/workers. |
 | SEC-03 | Permitir red en A, abrir B, revocar en A con conexiones activas. | Permiso sólo de A; revocación efectiva; B continúa OFFLINE. |

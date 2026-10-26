@@ -1,14 +1,19 @@
 package com.hypermarker.markdown
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.view.MotionEvent
+import android.view.accessibility.AccessibilityManager
 import android.webkit.*
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
@@ -16,6 +21,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -44,6 +52,9 @@ import com.hypermarker.storage.Document
 import com.hypermarker.storage.LibraryRepository
 import com.hypermarker.viewer.DocumentWebView
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import java.util.UUID
 
@@ -67,14 +78,69 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
     var visualGeneration by remember { mutableIntStateOf(0) }
     var webReady by remember { mutableStateOf(false) }
     var initialized by remember { mutableStateOf(false) }
-    var field by remember { mutableStateOf(TextFieldValue(model.source)) }
+    val field = rememberTextFieldState()
+    val sourceScroll = rememberScrollState()
+    var visualScrollFraction by remember { mutableFloatStateOf(0f) }
+    var sourceScrollTarget by remember { mutableStateOf<Float?>(null) }
+    var sourcePositionFromVisual by remember { mutableStateOf<Float?>(null) }
+    var toolsVisible by remember { mutableStateOf(true) }
+    var lastInteraction by remember { mutableIntStateOf(0) }
+    var toolbarMenuOpen by remember { mutableStateOf(false) }
+    var fingerDown by remember { mutableStateOf(false) }
+    val touchExploration = remember(context) {
+        (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager).isTouchExplorationEnabled
+    }
+    fun touched() { toolsVisible = true; lastInteraction++ }
+    LaunchedEffect(lastInteraction, touchExploration, toolbarMenuOpen, fingerDown) {
+        if (!touchExploration && !toolbarMenuOpen && !fingerDown) { delay(5_000); toolsVisible = false }
+    }
+    LaunchedEffect(model.visual, sourceScrollTarget) {
+        val target = sourceScrollTarget
+        if (!model.visual && target != null) {
+            if (target > 0f && model.source.isNotEmpty()) withTimeoutOrNull(2_000) {
+                snapshotFlow { sourceScroll.maxValue }.first { it > 0 }
+            }
+            withFrameNanos { }
+            if (sourceScroll.maxValue > 0) sourceScroll.scrollTo((sourceScroll.maxValue * target).toInt().coerceIn(0, sourceScroll.maxValue))
+            sourceScrollTarget = null
+        }
+    }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     // Undo/redo, carga y sincronización desde Visual cambian la fuente fuera del campo.
-    LaunchedEffect(model.source) { if (field.text != model.source) field = TextFieldValue(model.source, TextRange(field.selection.end.coerceAtMost(model.source.length))) }
+    LaunchedEffect(model.source) { if (field.text.toString() != model.source) field.edit {
+        val caret = selection.end.coerceAtMost(model.source.length)
+        replace(0, length, model.source)
+        selection = TextRange(caret)
+    } }
+    LaunchedEffect(field) { snapshotFlow { field.text.toString() }.collect { value ->
+        if (value != model.source) {
+            touched()
+            if (!model.visual) sourcePositionFromVisual = null
+            model.edit(value)
+            if (model.source != value) field.edit { replace(0, length, model.source) }
+        }
+    } }
+    fun fieldValue() = TextFieldValue(field.text.toString(), field.selection)
+    fun updateField(value: TextFieldValue) {
+        if (!model.visual) sourcePositionFromVisual = null
+        field.edit { replace(0, length, value.text); selection = value.selection }
+        model.edit(value.text)
+    }
     fun flushVisual(then: () -> Unit) {
         val editor = visualWeb
-        if (model.visual && webReady && editor != null) editor.evaluateJavascript("window.editorMarkdown?.()") { value ->
-            runCatching { val text = org.json.JSONTokener(value).nextValue(); if (text is String) model.edit(text) }
+        if (model.visual && webReady && editor != null) editor.evaluateJavascript("window.editorSnapshot?.()") { value ->
+            runCatching {
+                val snapshot = JSONObject(org.json.JSONTokener(value).nextValue() as String)
+                val source = snapshot.getString("source")
+                val fraction = snapshot.optDouble("fraction", 0.0).toFloat().coerceIn(0f, 1f)
+                field.edit {
+                    replace(0, length, source)
+                    selection = TextRange((source.length * fraction).toInt().coerceIn(0, source.length))
+                }
+                model.edit(source)
+                sourceScrollTarget = fraction
+                sourcePositionFromVisual = fraction
+            }
             then()
         } else then()
     }
@@ -85,9 +151,10 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         visualWeb?.evaluateJavascript("window.editorCommand?.(${JSONObject.quote(name)},$argument)", null)
     }
     fun command(command: FormatCommand) {
+        touched()
         if (!model.visual) {
-            if (command == FormatCommand.Link) { linkFor = field.edit(); return }
-            field = command.applyTo(field.edit()).value(); model.edit(field.text); return
+            if (command == FormatCommand.Link) { linkFor = fieldValue().edit(); return }
+            updateField(command.applyTo(fieldValue().edit()).value()); return
         }
         when (command) {
             FormatCommand.Link -> visualLink = true
@@ -100,7 +167,12 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         if (model.visual) return
         if (model.unsupported()) warning = true
         else if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) model.error = "Actualiza Android System WebView para utilizar el editor visual."
-        else model.visual = true
+        else {
+            visualScrollFraction = sourcePositionFromVisual ?: if (sourceScroll.maxValue > 0) sourceScroll.value.toFloat() / sourceScroll.maxValue
+                else if (model.source.isNotEmpty()) field.selection.end.toFloat() / model.source.length else 0f
+            sourcePositionFromVisual = null
+            model.visual = true
+        }
     }
     BackHandler { close() }
     DisposableEffect(lifecycle) {
@@ -118,42 +190,65 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
     val selection = TextSelectionColors(handleColor = colors.content, backgroundColor = colors.content.copy(alpha = .22f))
     Column(Modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).imePadding()) {
         val icons = IconButtonDefaults.iconButtonColors(contentColor = colors.content, disabledContentColor = colors.muted.copy(alpha = .5f))
-        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = ::close, colors = icons) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Guardar y volver") }
+        if (!toolsVisible) IconButton(onClick = ::touched, modifier = Modifier.align(Alignment.End), colors = icons) {
+            Icon(Icons.Outlined.ExpandMore, "Mostrar herramientas")
+        }
+        if (toolsVisible) Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { touched(); close() }, colors = icons) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Guardar y volver") }
             Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
                 Text(document.title, color = colors.content, maxLines = 1, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
                 Text(if (model.saved) "Guardado" else "Guardando…", color = colors.muted, fontSize = 12.sp)
             }
-            IconButton(enabled = model.canUndo, colors = icons, onClick = { model.undo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Undo, "Deshacer") }
-            IconButton(enabled = model.canRedo, colors = icons, onClick = { model.redo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Redo, "Rehacer") }
-            IconButton(colors = icons, onClick = { dark = !dark; style.dark = dark }) { Icon(if (dark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode, if (dark) "Hoja clara" else "Hoja oscura") }
+            IconButton(enabled = model.canUndo, colors = icons, onClick = { touched(); model.undo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Undo, "Deshacer") }
+            IconButton(enabled = model.canRedo, colors = icons, onClick = { touched(); model.redo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Redo, "Rehacer") }
+            IconButton(colors = icons, onClick = { touched(); dark = !dark; style.dark = dark }) { Icon(if (dark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode, if (dark) "Hoja clara" else "Hoja oscura") }
         }
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 2.dp).clip(RoundedCornerShape(50)).background(colors.selected).padding(3.dp)) {
+        if (toolsVisible) Row(Modifier.padding(horizontal = 16.dp, vertical = 2.dp).clip(RoundedCornerShape(50)).background(colors.selected).padding(3.dp)) {
             listOf(false to "Fuente", true to "Visual").forEach { (visual, label) ->
                 val active = model.visual == visual
                 Text(label, color = if (active) colors.background else colors.content, fontSize = 14.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(if (active) colors.content else colors.selected)
-                        .clickable(role = Role.Tab) { if (visual) openVisual() else flushVisual { model.visual = false } }
+                        .clickable(role = Role.Tab) { touched(); if (visual) openVisual() else flushVisual { model.visual = false } }
                         .semantics { this.selected = active }
                         .padding(horizontal = 18.dp, vertical = 7.dp))
             }
         }
-        MarkdownToolbar(colors, font, model.loaded && (!model.visual || webReady), onFont = { font = it; style.font = it }, onCommand = ::command)
-        HorizontalDivider(color = colors.divider)
+        if (toolsVisible) {
+            MarkdownToolbar(colors, font, model.loaded && (!model.visual || webReady), onFont = { font = it; style.font = it }, onCommand = ::command,
+                onMenuExpandedChange = { toolbarMenuOpen = it })
+            HorizontalDivider(color = colors.divider)
+        }
         if (!model.visual) CompositionLocalProvider(LocalTextSelectionColors provides selection) {
-            BasicTextField(field, { value -> model.edit(value.text); field = if (model.source == value.text) value else TextFieldValue(model.source, field.selection) }, enabled = model.loaded,
+          Box(Modifier.fillMaxSize()) {
+            if (field.text.isEmpty()) Text("# Una idea nueva\n\nEmpieza a escribir…", color = colors.muted, fontFamily = sheetFont(font), fontSize = 17.sp, lineHeight = 27.sp,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp))
+            BasicTextField(state = field, enabled = model.loaded,
                 textStyle = TextStyle(color = colors.content, fontFamily = sheetFont(font), fontSize = 17.sp, lineHeight = 27.sp),
                 cursorBrush = SolidColor(colors.content),
-                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
-                decorationBox = { inner ->
-                    Box { if (field.text.isEmpty()) Text("# Una idea nueva\n\nEmpieza a escribir…", color = colors.muted, fontFamily = sheetFont(font), fontSize = 17.sp, lineHeight = 27.sp); inner() }
-                })
+                scrollState = sourceScroll,
+                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.changes.any { it.pressed && !it.previousPressed }) { fingerDown = true; sourcePositionFromVisual = null; touched() }
+                            if (event.changes.none { it.pressed }) fingerDown = false
+                        }
+                    }
+                }.padding(horizontal = 24.dp, vertical = 20.dp))
+          }
         } else key(visualGeneration) {
             val session = remember { UUID.randomUUID().toString() }
             AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                 webReady = false; initialized = false
                 WebView(context).apply {
                     visualWeb = this
+                    setOnTouchListener { _, event ->
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN -> { fingerDown = true; touched() }
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> fingerDown = false
+                        }
+                        false
+                    }
                     setBackgroundColor(colors.background.toArgb())
                     settings.javaScriptEnabled = true; settings.allowFileAccess = false; settings.allowContentAccess = false
                     settings.domStorageEnabled = false; settings.blockNetworkLoads = true
@@ -168,7 +263,10 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                             if (data.optString("sessionId") != session) return@runCatching
                             when (data.optString("type")) {
                                 "change" -> if (initialized) model.edit(data.getJSONObject("payload").getString("source"))
-                                "loaded" -> { initialized = true; webReady = true }
+                                "loaded" -> {
+                                    initialized = true; webReady = true
+                                    evaluateJavascript("window.editorSetScrollFraction?.($visualScrollFraction)", null)
+                                }
                                 "error" -> { model.error = data.getJSONObject("payload").optString("message"); model.visual = false }
                             }
                         }
@@ -195,7 +293,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         }
     }
     linkFor?.let { edit -> LinkDialog(edit.selected.isNotEmpty(), onDismiss = { linkFor = null }) { url ->
-        field = MarkdownFormatter.link(edit, url).value(); model.edit(field.text); linkFor = null
+        updateField(MarkdownFormatter.link(edit, url).value()); linkFor = null
     } }
     if (visualLink) LinkDialog(true, onDismiss = { visualLink = false }) { url -> visualCommand("link", url); visualLink = false }
     if (warning) AlertDialog(onDismissRequest = { warning = false }, title = { Text("Conserva esta nota en Fuente") },
