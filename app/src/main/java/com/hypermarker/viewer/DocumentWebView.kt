@@ -24,6 +24,8 @@ import kotlin.math.roundToInt
 class DocumentWebView(context: Context, val document: Document, private val repository: LibraryRepository,
     private val event: (JSONObject) -> Unit, private val console: (String) -> Unit,
     private val finished: (DocumentWebView) -> Unit, private val crashed: () -> Unit) : WebView(context) {
+    // Un renderer conserva una sola generación aunque sync publique otra mientras está abierto.
+    private val contentRoot = repository.original(document.id)
     val origin = "https://d${document.id}.hypermarker.invalid"
     var sessionId = UUID.randomUUID().toString()
     private var validator = BridgeValidator(sessionId, document.id, document.revision)
@@ -203,12 +205,12 @@ class DocumentWebView(context: Context, val document: Document, private val repo
         val uri = Uri.parse(page)
         require(uri.scheme == null && uri.authority == null && page.startsWith("/") && !page.startsWith("//")) { "Página no permitida" }
         val path = PathGuard.normalize(uri.path.orEmpty().trimStart('/'))
-        require(PathGuard.resolve(repository.original(document.id), path).isFile) { "La página guardada no existe" }
+        require(PathGuard.resolve(contentRoot, path).isFile) { "La página guardada no existe" }
         val encoded = path.split('/').joinToString("/") { Uri.encode(it) }
         loadUrl("$origin/$encoded" + (uri.encodedQuery?.let { "?$it" } ?: "") + (uri.encodedFragment?.let { "#$it" } ?: ""))
     }
     private fun localResponse(path: String): WebResourceResponse = runCatching {
-        val file = PathGuard.resolve(repository.original(document.id), Uri.decode(path))
+        val file = PathGuard.resolve(contentRoot, Uri.decode(path))
         require(file.isFile)
         val mime = when (file.extension.lowercase()) {
             "html", "htm" -> "text/html"; "js", "mjs" -> "application/javascript"; "css" -> "text/css"

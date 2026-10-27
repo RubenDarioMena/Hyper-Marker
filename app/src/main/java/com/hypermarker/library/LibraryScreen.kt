@@ -26,9 +26,17 @@ private fun kindIcon(type: String) = when (type) { "HTML" -> Icons.Outlined.Code
 fun LibraryScreen(model: LibraryViewModel) {
     val folders by model.folders.collectAsState()
     val documents by model.documents.collectAsState()
+    val remoteFolders by model.remoteFolders.collectAsState()
+    val remoteEntries by model.remoteEntries.collectAsState()
+    val remoteByLibraryId = remoteFolders.associateBy { it.folderId }
+    val remoteDocumentIds = remoteEntries.mapNotNull { it.documentId }.toSet()
+    val retiredDocumentIds = remoteEntries.groupBy { it.documentId }.filter { (id, entries) ->
+        id != null && entries.all { it.state == "RETIRED" }
+    }.keys
     var search by remember { mutableStateOf("") }
     var adding by remember { mutableStateOf(false) }
     var licenses by remember { mutableStateOf(false) }
+    var usage by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Item?>(null) }
     var operation by remember { mutableStateOf<String?>(null) }
     var title by remember { mutableStateOf("") }
@@ -58,6 +66,8 @@ fun LibraryScreen(model: LibraryViewModel) {
                     }
                     DropdownMenuItem(text = { Text("Importar HTML, ZIP o Markdown") }, onClick = { adding = false; filePicker.launch(arrayOf("*/*")) })
                     DropdownMenuItem(text = { Text("Importar carpeta HTML") }, onClick = { adding = false; treePicker.launch(null) })
+                    DropdownMenuItem(text = { Text("Añadir carpeta de GitHub") }, onClick = { adding = false; model.githubScreen = true })
+                    DropdownMenuItem(text = { Text("GitHub · Sincronización y consumo") }, onClick = { adding = false; usage = true })
                     DropdownMenuItem(text = { Text("Licencias de código abierto") }, onClick = { adding = false; licenses = true })
                 }
             }
@@ -84,11 +94,15 @@ fun LibraryScreen(model: LibraryViewModel) {
                 }
             } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(entries, key = { it.id }) { item ->
+                    val remote = if (item.folder) remoteByLibraryId[item.id] else null
                     ListItem(headlineContent = { Text(item.title) },
-                        supportingContent = { Text(if (item.folder) "Carpeta" else kindLabel(documents.first { it.id == item.id }.type)) },
-                        leadingContent = { Icon(if (item.folder) Icons.Outlined.Folder else kindIcon(documents.first { it.id == item.id }.type), null, tint = MaterialTheme.colorScheme.primary) },
+                        supportingContent = { Text(if (remote != null) "GitHub · ${remote.branch} · ${com.hypermarker.github.remoteStatusLabel(remote.status)}"
+                            else if (item.folder) "Carpeta" else if (item.id in retiredDocumentIds) "Retirado de origen · copia offline"
+                            else if (documents.first { it.id == item.id }.type == "REMOTE_MARKDOWN") "Markdown · GitHub · solo lectura"
+                            else kindLabel(documents.first { it.id == item.id }.type)) },
+                        leadingContent = { Icon(if (remote != null) Icons.Outlined.Cloud else if (item.folder) Icons.Outlined.Folder else kindIcon(documents.first { it.id == item.id }.type), null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = { IconButton(onClick = { selected = item; operation = "menu" }) { Icon(Icons.Outlined.MoreVert, "Acciones de ${item.title}") } },
-                        modifier = Modifier.combinedClickable(onClick = { if (item.folder) { model.folderId = item.id; search = "" } else model.openedId = item.id },
+                        modifier = Modifier.combinedClickable(onClick = { if (item.folder) { model.enterFolder(item.id); search = "" } else model.openedId = item.id },
                             onLongClick = { selected = item; operation = "menu" }))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
                 }
@@ -96,13 +110,48 @@ fun LibraryScreen(model: LibraryViewModel) {
         }
     }
     if (licenses) LicenseDialog { licenses = false }
+    if (usage) com.hypermarker.github.GitHubUsageDialog(model) { usage = false }
     if (model.busy) AlertDialog(onDismissRequest = {}, title = { Text("Preparando tu biblioteca") }, text = { LinearProgressIndicator(Modifier.fillMaxWidth()) },
         confirmButton = { TextButton(onClick = model::cancel) { Text("Cancelar") } })
     model.error?.let { error -> AlertDialog(onDismissRequest = { model.error = null }, title = { Text("No se pudo completar") }, text = { Text(error) }, confirmButton = { TextButton(onClick = { model.error = null }) { Text("Entendido") } }) }
+    model.githubMessage?.let { message -> AlertDialog(onDismissRequest = { model.githubMessage = null }, title = { Text("GitHub") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { model.githubMessage = null }) { Text("Entendido") } }) }
     model.pending?.let { pending -> AlertDialog(onDismissRequest = model::cancelImport, title = { Text("Elige la página inicial") },
         text = { LazyColumn { items(pending.entries) { path -> TextButton(onClick = { model.chooseEntry(path) }) { Text(path) } } } },
         confirmButton = {}, dismissButton = { TextButton(onClick = model::cancelImport) { Text("Cancelar") } }) }
-    if (operation == "menu" && selected != null) AlertDialog(onDismissRequest = { operation = null }, title = { Text(selected!!.title) },
+    if (operation == "menu" && selected != null && selected!!.folder && remoteByLibraryId[selected!!.id] != null) {
+        val remote = remoteByLibraryId.getValue(selected!!.id)
+        AlertDialog(onDismissRequest = { operation = null }, title = { Text(selected!!.title) },
+            text = { Column {
+                Text("${remote.owner}/${remote.repo} · ${remote.branch} / ${remote.repoPath.ifBlank { "raíz" }}")
+                Text("Última actualización: ${if (remote.lastSuccess == 0L) "pendiente" else java.text.DateFormat.getDateTimeInstance().format(java.util.Date(remote.lastSuccess))}")
+                TextButton(onClick = { operation = null; model.refreshGitHub(remote.id) }) { Text("Actualizar ahora") }
+                TextButton(onClick = { operation = null; model.toggleGitHubAuto(remote.id) }) { Text(if (remote.autoSync) "Desactivar sincronización automática" else "Activar sincronización automática") }
+                TextButton(onClick = { operation = null; model.githubScreen = true }) { Text("Elegir otra rama (copia separada)") }
+                TextButton(onClick = { operation = "unlink" }) { Text("Desvincular y conservar copias") }
+            } }, confirmButton = { TextButton(onClick = { operation = null }) { Text("Cerrar") } })
+    }
+    if (operation == "unlink" && selected != null) {
+        val remote = remoteByLibraryId[selected!!.id]
+        AlertDialog(onDismissRequest = { operation = null }, title = { Text("Desvincular GitHub") },
+            text = { Text("La carpeta dejará de actualizarse. Sus documentos y anotaciones quedarán como copias locales; la credencial de la cuenta seguirá disponible para otras carpetas.") },
+            confirmButton = { TextButton(onClick = { operation = null; if (remote != null) model.unlinkGitHub(remote.id) }) { Text("Desvincular") } },
+            dismissButton = { TextButton(onClick = { operation = null }) { Text("Cancelar") } })
+    }
+    if (operation == "menu" && selected != null && !selected!!.folder && selected!!.id in remoteDocumentIds) {
+        val document = documents.first { it.id == selected!!.id }
+        AlertDialog(onDismissRequest = { operation = null }, title = { Text(selected!!.title) },
+            text = { Column { Text("GitHub · solo lectura. Los cambios remotos no modifican tus notas locales.")
+                TextButton(onClick = { operation = null; if (document.type == "REMOTE_MARKDOWN") model.copyRemoteMarkdown(document.id) else model.copyRemoteHtml(document.id) }) {
+                    Text("Crear copia local")
+                }
+                if (document.id in retiredDocumentIds) TextButton(onClick = { operation = "delete-retired" }) { Text("Eliminar copia retirada") }
+            } }, confirmButton = { TextButton(onClick = { operation = null }) { Text("Cerrar") } })
+    }
+    if (operation == "delete-retired" && selected != null) AlertDialog(onDismissRequest = { operation = null },
+        title = { Text("¿Eliminar copia retirada?") }, text = { Text("Se borrarán este documento y sus anotaciones locales. Esta acción no se puede deshacer.") },
+        confirmButton = { TextButton(onClick = { val id = selected!!.id; operation = null; model.deleteRetiredRemoteDocument(id) }) { Text("Eliminar") } },
+        dismissButton = { TextButton(onClick = { operation = null }) { Text("Cancelar") } })
+    if (operation == "menu" && selected != null && !(selected!!.folder && remoteByLibraryId[selected!!.id] != null) && selected!!.id !in remoteDocumentIds) AlertDialog(onDismissRequest = { operation = null }, title = { Text(selected!!.title) },
         text = { Column {
             listOf("rename" to "Renombrar", "move" to "Mover", "duplicate" to "Duplicar", "delete" to "Eliminar").forEach { (action, label) ->
                 TextButton(onClick = {

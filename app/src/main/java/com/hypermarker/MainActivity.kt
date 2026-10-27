@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import com.hypermarker.flow.FlowScreen
+import com.hypermarker.github.GitHubAddScreen
+import com.hypermarker.github.RemoteMarkdownScreen
 import com.hypermarker.library.LibraryScreen
 import com.hypermarker.library.LibraryViewModel
 import com.hypermarker.markdown.MarkdownScreen
@@ -30,11 +32,14 @@ class MainActivity : ComponentActivity() {
                 val docs by model.documents.collectAsState()
                 val document = docs.firstOrNull { it.id == model.openedId }
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    when (document?.type) {
-                        "HTML" -> ReaderScreen(document, model.repository, onClose = { model.openedId = null },
+                    when {
+                        model.githubScreen -> GitHubAddScreen(model)
+                        document?.type == "REMOTE_MARKDOWN" -> RemoteMarkdownScreen(document, model.repository,
+                            onClose = { model.openedId = null }, onCopy = { model.openedId = it })
+                        document?.type == "HTML" -> ReaderScreen(document, model.repository, onClose = { model.openedId = null },
                             onMarkdown = { model.action { model.openedId = model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id } })
-                        "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = { model.openedId = null })
-                        "FLOW" -> FlowScreen(document, model.repository, onClose = { model.openedId = null })
+                        document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = { model.openedId = null })
+                        document?.type == "FLOW" -> FlowScreen(document, model.repository, onClose = { model.openedId = null })
                         else -> LibraryScreen(model)
                     }
                 }

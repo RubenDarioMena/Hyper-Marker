@@ -37,6 +37,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.1")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("org.apache.commons:commons-compress:1.28.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")

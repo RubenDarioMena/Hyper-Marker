@@ -1,6 +1,6 @@
 Hyper-Marker — componentes Android/JVM
 
-Kotlin, kotlinx.coroutines, AndroidX Compose/Activity/Lifecycle/Core/Room/WebKit/DocumentFile, Apache Commons Compress/IO/Codec/Lang: Apache License 2.0.
+Kotlin, kotlinx.coroutines, AndroidX Compose/Activity/Lifecycle/Core/Room/WebKit/DocumentFile/WorkManager/Startup/Tracing, Apache Commons Compress/IO/Codec/Lang: Apache License 2.0.
 El texto completo de Apache-2.0 está en APACHE-2.0.txt.
 
 Versiones directas en app/build.gradle.kts; las licencias y avisos embebidos de sus dependencias se conservan en el APK donde corresponde.

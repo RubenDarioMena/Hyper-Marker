@@ -35,12 +35,32 @@ data class FlowNode(@PrimaryKey val id: String, val documentId: String, val titl
 data class FlowEdge(@PrimaryKey val id: String, val documentId: String, val fromId: String, val toId: String,
     val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null)
 
+@Entity(tableName = "remote_folders", foreignKeys = [ForeignKey(entity = Folder::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["folderId"], unique = true), Index(value = ["repositoryId", "branch", "repoPath"])])
+data class RemoteFolder(@PrimaryKey val id: String, val folderId: String, val repositoryId: Long,
+    val owner: String, val repo: String, val branch: String, val repoPath: String,
+    val autoSync: Boolean = false, val latestCommitSha: String? = null, val status: String = "PENDING",
+    val lastAttempt: Long = 0, val lastSuccess: Long = 0, val lastCheck: Long = 0,
+    val htmlDocumentId: String? = null, val htmlEntryPath: String? = null, val refEtag: String? = null,
+    val failureCount: Int = 0, val nextRetryAt: Long = 0)
+
+@Entity(tableName = "remote_entries", foreignKeys = [ForeignKey(entity = RemoteFolder::class, parentColumns = ["id"], childColumns = ["remoteFolderId"], onDelete = ForeignKey.CASCADE)], indices = [Index("remoteFolderId"), Index(value = ["remoteFolderId", "path"], unique = true)])
+data class RemoteEntry(@PrimaryKey val id: String, val remoteFolderId: String, val path: String,
+    val sha: String, val size: Long, val documentId: String? = null, val state: String = "ACTIVE")
+
 @Dao
 interface LibraryDao {
     @Query("SELECT * FROM folders ORDER BY name COLLATE NOCASE") fun observeFolders(): Flow<List<Folder>>
     @Query("SELECT * FROM documents ORDER BY title COLLATE NOCASE") fun observeDocuments(): Flow<List<Document>>
     @Query("SELECT * FROM folders") suspend fun folders(): List<Folder>
     @Query("SELECT * FROM documents") suspend fun documents(): List<Document>
+    @Query("SELECT * FROM remote_folders") fun observeRemoteFolders(): Flow<List<RemoteFolder>>
+    @Query("SELECT * FROM remote_entries") fun observeRemoteEntries(): Flow<List<RemoteEntry>>
+    @Query("SELECT * FROM remote_folders") suspend fun remoteFolders(): List<RemoteFolder>
+    @Query("SELECT * FROM remote_folders WHERE id=:id") suspend fun remoteFolder(id: String): RemoteFolder?
+    @Query("SELECT * FROM remote_folders WHERE folderId=:folderId") suspend fun remoteFolderForLibrary(folderId: String): RemoteFolder?
+    @Query("SELECT * FROM remote_entries WHERE remoteFolderId=:folderId") suspend fun remoteEntries(folderId: String): List<RemoteEntry>
+    @Query("SELECT * FROM remote_entries WHERE documentId=:documentId LIMIT 1") suspend fun remoteEntryForDocument(documentId: String): RemoteEntry?
+    @Query("SELECT * FROM remote_entries WHERE documentId=:documentId") suspend fun remoteEntriesForDocument(documentId: String): List<RemoteEntry>
     @Query("SELECT * FROM documents WHERE id=:id") suspend fun document(id: String): Document?
     @Query("SELECT * FROM folders WHERE id=:id") suspend fun folder(id: String): Folder?
     @Query("SELECT * FROM annotations WHERE documentId=:id ORDER BY id") fun observeAnnotations(id: String): Flow<List<Annotation>>
@@ -57,13 +77,18 @@ interface LibraryDao {
     @Query("SELECT * FROM flow_edges WHERE documentId=:id AND deletedAt IS NULL") suspend fun flowEdges(id: String): List<FlowEdge>
     @Upsert suspend fun put(node: FlowNode)
     @Upsert suspend fun put(edge: FlowEdge)
+    @Upsert suspend fun put(folder: RemoteFolder)
+    @Upsert suspend fun put(entry: RemoteEntry)
+    @Query("DELETE FROM remote_entries WHERE remoteFolderId=:folderId") suspend fun clearRemoteEntries(folderId: String)
+    @Query("DELETE FROM remote_entries WHERE documentId=:documentId") suspend fun clearRemoteEntriesForDocument(documentId: String)
+    @Query("DELETE FROM remote_folders WHERE id=:id") suspend fun deleteRemoteFolder(id: String)
     @Upsert suspend fun putFlowNodes(values: List<FlowNode>)
     @Upsert suspend fun putFlowEdges(values: List<FlowEdge>)
     @Query("DELETE FROM folders WHERE id=:id") suspend fun deleteFolder(id: String)
     @Query("DELETE FROM documents WHERE id=:id") suspend fun deleteDocument(id: String)
 }
 
-@Database(entities = [Folder::class, Document::class, Annotation::class, ViewerPreference::class, FlowNode::class, FlowEdge::class], version = 2, exportSchema = true)
+@Database(entities = [Folder::class, Document::class, Annotation::class, ViewerPreference::class, FlowNode::class, FlowEdge::class, RemoteFolder::class, RemoteEntry::class], version = 3, exportSchema = true)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
     companion object {
@@ -76,6 +101,16 @@ abstract class LibraryDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_edges_documentId` ON `flow_edges` (`documentId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_edges_fromId` ON `flow_edges` (`fromId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_edges_toId` ON `flow_edges` (`toId`)")
+            }
+        }
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `remote_folders` (`id` TEXT NOT NULL, `folderId` TEXT NOT NULL, `repositoryId` INTEGER NOT NULL, `owner` TEXT NOT NULL, `repo` TEXT NOT NULL, `branch` TEXT NOT NULL, `repoPath` TEXT NOT NULL, `autoSync` INTEGER NOT NULL, `latestCommitSha` TEXT, `status` TEXT NOT NULL, `lastAttempt` INTEGER NOT NULL, `lastSuccess` INTEGER NOT NULL, `lastCheck` INTEGER NOT NULL, `htmlDocumentId` TEXT, `htmlEntryPath` TEXT, `refEtag` TEXT, `failureCount` INTEGER NOT NULL, `nextRetryAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`folderId`) REFERENCES `folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_remote_folders_folderId` ON `remote_folders` (`folderId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_remote_folders_repositoryId_branch_repoPath` ON `remote_folders` (`repositoryId`, `branch`, `repoPath`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `remote_entries` (`id` TEXT NOT NULL, `remoteFolderId` TEXT NOT NULL, `path` TEXT NOT NULL, `sha` TEXT NOT NULL, `size` INTEGER NOT NULL, `documentId` TEXT, `state` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`remoteFolderId`) REFERENCES `remote_folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_remote_entries_remoteFolderId` ON `remote_entries` (`remoteFolderId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_remote_entries_remoteFolderId_path` ON `remote_entries` (`remoteFolderId`, `path`)")
             }
         }
     }

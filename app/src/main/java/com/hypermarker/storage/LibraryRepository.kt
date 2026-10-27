@@ -17,7 +17,7 @@ import java.util.UUID
 
 class LibraryRepository(val context: Context, database: LibraryDatabase? = null) {
     val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
-        .addMigrations(LibraryDatabase.MIGRATION_1_2).build()
+        .addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3).build()
     val dao = this.database.dao()
     private val mutex = Mutex()
     private var recovered = false
@@ -27,29 +27,76 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         require(id.matches(Regex("[a-f0-9-]{36}"))) { "Identidad inválida" }
         return File(context.filesDir, "documents/$id")
     }
-    fun original(id: String) = File(directory(id), "original")
+    fun original(id: String): File {
+        val root = directory(id)
+        val version = File(root, "remote-current").takeIf { it.isFile }?.readText()?.trim()
+        if (version != null && version.matches(Regex("[a-f0-9]{40}"))) {
+            val selected = File(root, "remote-versions/$version")
+            if (selected.isDirectory) return selected
+        }
+        return File(root, "original")
+    }
+    fun installRemoteVersion(id: String, sha: String) {
+        require(sha.matches(Regex("[a-f0-9]{40}")))
+        require(File(directory(id), "remote-versions/$sha").isDirectory)
+        atomicWrite(File(directory(id), "remote-current"), sha)
+    }
     private fun markdown(id: String) = File(directory(id), "markdown/source.md")
     private fun name(value: String) = value.trim().also { require(it.isNotEmpty() && it.length <= 200) { "Usa un nombre de 1 a 200 caracteres" } }
     private suspend fun <T> write(block: suspend () -> T): T = withContext(Dispatchers.IO) { mutex.withLock { block() } }
+    internal suspend fun <T> remoteMutation(block: suspend () -> T): T = write(block)
     private suspend fun checkParent(parent: String?) { require(parent == null || dao.folder(parent) != null) { "La carpeta ya no existe" } }
+    private suspend fun includesRemoteFolder(folderId: String): Boolean {
+        val parents = dao.folders().associate { it.id to it.parentId }
+        return dao.remoteFolders().any { remote ->
+            var current: String? = remote.folderId
+            val seen = mutableSetOf<String>()
+            while (current != null && seen.add(current)) {
+                if (current == folderId) return@any true
+                current = parents[current]
+            }
+            false
+        }
+    }
 
     suspend fun recover() = write {
         if (recovered) return@write
         File(context.filesDir, "imports").deleteRecursively()
         val existing = dao.documents().map { it.id }.toSet()
         File(context.filesDir, "documents").listFiles()?.filter { it.name !in existing }?.forEach { it.deleteRecursively() }
+        dao.remoteFolders().forEach { remote ->
+            val document = remote.htmlDocumentId
+            val sha = remote.latestCommitSha
+            if (document != null && sha != null && File(directory(document), "remote-versions/$sha").isDirectory)
+                installRemoteVersion(document, sha)
+        }
+        // Este mutex también se usa en sync: nunca limpiar una generación en instalación.
+        File(context.filesDir, "remote-sync").deleteRecursively()
+        dao.documents().forEach { doc ->
+            val root = directory(doc.id)
+            val markdownVersion = doc.entryPath?.takeIf { doc.type == "REMOTE_MARKDOWN" }?.split('/')?.getOrNull(1)
+            File(root, "versions").listFiles()?.filter { it.name != markdownVersion }?.forEach { it.deleteRecursively() }
+            val htmlVersion = File(root, "remote-current").takeIf { it.isFile }?.readText()?.trim()
+            File(root, "remote-versions").listFiles()?.filter { it.name != htmlVersion }?.forEach { it.deleteRecursively() }
+        }
+        dao.remoteFolders().filter { it.status == "SYNCING" }.forEach { dao.put(it.copy(status = "PENDING")) }
         recovered = true
     }
     suspend fun createFolder(parent: String?, title: String) = write { checkParent(parent); dao.put(Folder(id(), parent, name(title))) }
     suspend fun createMarkdown(parent: String?, title: String, source: String = ""): Document = write {
+        createMarkdownLocked(parent, title, source)
+    }
+    private suspend fun createMarkdownLocked(parent: String?, title: String, source: String): Document {
         checkParent(parent)
         val document = Document(id(), parent, name(title), "MARKDOWN")
-        try { atomicWrite(markdown(document.id), source); dao.put(document); document }
+        return try { atomicWrite(markdown(document.id), source); dao.put(document); document }
         catch (error: Throwable) { directory(document.id).deleteRecursively(); throw error }
     }
     suspend fun readMarkdown(id: String) = withContext(Dispatchers.IO) {
-        require(dao.document(id)?.type == "MARKDOWN")
-        AtomicFile(markdown(id)).readFully().toString(Charsets.UTF_8)
+        val doc = requireNotNull(dao.document(id))
+        require(doc.type in listOf("MARKDOWN", "REMOTE_MARKDOWN"))
+        if (doc.type == "REMOTE_MARKDOWN") PathGuard.resolve(directory(id), requireNotNull(doc.entryPath)).readText()
+        else AtomicFile(markdown(id)).readFully().toString(Charsets.UTF_8)
     }
     suspend fun saveMarkdown(id: String, source: String) = write {
         require(source.toByteArray().size <= 2 * 1024 * 1024) { "La nota supera 2 MiB" }
@@ -95,10 +142,12 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         } catch (error: Throwable) { destination.deleteRecursively(); pending.directory.deleteRecursively(); throw error }
     }
     suspend fun rename(id: String, folder: Boolean, title: String) = write {
+        require(if (folder) dao.remoteFolderForLibrary(id) == null else dao.remoteEntryForDocument(id) == null) { "El contenido GitHub es de solo lectura" }
         if (folder) dao.put(requireNotNull(dao.folder(id)).copy(name = name(title)))
         else dao.put(requireNotNull(dao.document(id)).copy(title = name(title), updatedAt = System.currentTimeMillis()))
     }
     suspend fun move(id: String, folder: Boolean, parent: String?) = write {
+        require(if (folder) dao.remoteFolderForLibrary(id) == null else dao.remoteEntryForDocument(id) == null) { "El contenido GitHub es de solo lectura" }
         checkParent(parent)
         if (folder) {
             FolderRules.validateMove(id, parent, dao.folders().associate { it.id to it.parentId })
@@ -106,12 +155,16 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         } else dao.put(requireNotNull(dao.document(id)).copy(folderId = parent, updatedAt = System.currentTimeMillis()))
     }
     suspend fun delete(id: String, folder: Boolean) = write {
+        require(if (folder) dao.remoteFolderForLibrary(id) == null else dao.remoteEntryForDocument(id) == null) { "Desvincula la carpeta GitHub antes de eliminar su contenido" }
+        require(!folder || !includesRemoteFolder(id)) { "Esta carpeta contiene una fuente GitHub; desvincúlala primero" }
         val before = dao.documents().map { it.id }.toSet()
         if (folder) dao.deleteFolder(id) else dao.deleteDocument(id)
         val after = dao.documents().map { it.id }.toSet()
         (before - after).forEach { directory(it).deleteRecursively() }
     }
     suspend fun duplicate(id: String, folder: Boolean) = write {
+        require(if (folder) dao.remoteFolderForLibrary(id) == null else dao.remoteEntryForDocument(id) == null) { "Crea una copia local editable desde el documento remoto" }
+        require(!folder || !includesRemoteFolder(id)) { "No se puede duplicar una carpeta que contiene una fuente GitHub" }
         val created = mutableListOf<String>()
         suspend fun copyDocument(doc: Document, parent: String?) {
             val next = id(); created += next
@@ -140,6 +193,51 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         } catch (error: Throwable) { created.forEach { directory(it).deleteRecursively() }; throw error }
     }
     suspend fun setNetwork(id: String, allowed: Boolean) = write { dao.put(requireNotNull(dao.document(id)).copy(networkAllowed = allowed)) }
+    suspend fun copyRemoteMarkdown(id: String): Document = write {
+        val doc = requireNotNull(dao.document(id)) { "El documento ya no existe" }
+        require(doc.type == "REMOTE_MARKDOWN")
+        val parent = doc.folderId?.let { dao.folder(it)?.parentId }
+        createMarkdownLocked(parent, "${doc.title.take(185)} (copia local)", readMarkdown(id))
+    }
+    suspend fun copyRemoteHtml(id: String): Document = write {
+        val doc = requireNotNull(dao.document(id)) { "El documento ya no existe" }
+        require(doc.type == "HTML" && dao.remoteEntryForDocument(id) != null)
+        val parent = doc.folderId?.let { dao.folder(it)?.parentId }
+        val copy = doc.copy(id = id(), folderId = parent, title = "${doc.title.take(185)} (copia local)",
+            networkAllowed = false, revision = 1, createdAt = System.currentTimeMillis())
+        val destination = original(copy.id)
+        try {
+            require(original(id).copyRecursively(destination, overwrite = false))
+            dao.put(copy)
+            copy
+        } catch (error: Throwable) { directory(copy.id).deleteRecursively(); throw error }
+    }
+    suspend fun unlinkRemoteFolder(id: String) = write {
+        val remote = requireNotNull(dao.remoteFolder(id)) { "La carpeta GitHub ya no existe" }
+        val docs = dao.remoteEntries(id).mapNotNull { it.documentId }.toSet()
+        val markdownDocs = docs.mapNotNull { dao.document(it) }.filter { it.type == "REMOTE_MARKDOWN" }
+        for (doc in markdownDocs) atomicWrite(markdown(doc.id), readMarkdown(doc.id))
+        val htmlDocs = docs.mapNotNull { dao.document(it) }.filter { it.type == "HTML" }
+        htmlDocs.forEach { htmlDoc ->
+            val htmlId = htmlDoc.id
+            val target = File(directory(htmlId), "original")
+            if (target.exists()) target.deleteRecursively() // copia incompleta de un intento previo
+            require(original(htmlId).copyRecursively(target, overwrite = false)) { "No se pudo conservar el HTML local" }
+        }
+        database.withTransaction {
+            markdownDocs.forEach { dao.put(it.copy(type = "MARKDOWN", entryPath = null)) }
+            dao.deleteRemoteFolder(id)
+        }
+        // Los originales convertidos y las anotaciones mantienen sus IDs.
+        htmlDocs.forEach { File(directory(it.id), "remote-current").delete(); File(directory(it.id), "remote-versions").deleteRecursively() }
+        markdownDocs.forEach { File(directory(it.id), "versions").deleteRecursively() }
+    }
+    suspend fun deleteRetiredRemoteDocument(id: String) = write {
+        val entries = dao.remoteEntriesForDocument(id)
+        require(entries.isNotEmpty() && entries.all { it.state == "RETIRED" }) { "El documento no está retirado de origen" }
+        database.withTransaction { dao.clearRemoteEntriesForDocument(id); dao.deleteDocument(id) }
+        directory(id).deleteRecursively()
+    }
     suspend fun annotations(id: String) = withContext(Dispatchers.IO) { dao.annotations(id) }
     suspend fun replaceAnnotations(id: String, values: List<Annotation>) = write {
         require(dao.document(id) != null && values.size <= 10_000 && values.map { it.id }.toSet().size == values.size && values.sumOf { it.payload.length.toLong() * 2 } <= 32L * 1024 * 1024 && values.all { it.documentId == id && it.kind in listOf("PIN", "STROKE", "TEXT") && it.payload.length <= 512_000 })

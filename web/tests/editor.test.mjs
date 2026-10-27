@@ -18,6 +18,19 @@ test('bundled Milkdown renders and edits Markdown without remote requests',async
  const markdown=await page.evaluate(()=>editorMarkdown());assert.match(markdown,/Título/);assert.match(markdown,/\*\*Fuerte\*\*/);assert.match(markdown,/Una idea nueva/);assert.deepEqual(remote,[]);
  }finally{await browser.close();await new Promise(done=>server.close(done));}
 });
+test('remote Markdown visual mode is read-only',async()=>{
+ const root=resolve('../app/src/main/assets/editor');
+ const server=createServer(async(req,res)=>{try{const file=resolve(root,'.'+req.url);if(!file.startsWith(root+'/'))throw Error();const body=await readFile(file);res.setHeader('Content-Type',({'.js':'application/javascript','.css':'text/css','.html':'text/html'})[extname(file)]||'text/plain');res.end(body);}catch{res.statusCode=404;res.end();}});
+ await new Promise(done=>server.listen(0,'127.0.0.1',done));
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':chromium.executablePath()),headless:true});
+ try{const page=await browser.newPage();await page.goto('http://127.0.0.1:'+server.address().port+'/index.html');
+ await page.evaluate(()=>startEditor('# Remoto\n\nTexto conservado','remote',true));
+ await page.locator('.ProseMirror h1').waitFor();
+ assert.equal(await page.locator('.ProseMirror').getAttribute('contenteditable'),'false');
+ await page.locator('.ProseMirror').click();await page.keyboard.type('CAMBIO');
+ assert.equal((await page.evaluate(()=>editorMarkdown())).trimEnd(),'# Remoto\n\nTexto conservado');
+ }finally{await browser.close();await new Promise(done=>server.close(done));}
+});
 test('toolbar commands format the current selection, insert tables and switch the sheet theme',async()=>{
  const root=resolve('../app/src/main/assets/editor');
  const server=createServer(async(req,res)=>{try{const file=resolve(root,'.'+req.url);if(!file.startsWith(root+'/'))throw Error();const body=await readFile(file);res.setHeader('Content-Type',({'.js':'application/javascript','.css':'text/css','.html':'text/html'})[extname(file)]||'text/plain');res.end(body);}catch{res.statusCode=404;res.end();}});

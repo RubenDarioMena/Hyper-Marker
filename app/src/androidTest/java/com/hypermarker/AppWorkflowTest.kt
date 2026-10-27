@@ -49,6 +49,8 @@ class AppWorkflowTest {
     }
     /** El cromo de cristal se alterna tocando la página; sólo se toca si está oculto. */
     private fun showChrome() {
+        // Un AVD nuevo muestra una confirmación de Android sobre el primer lector inmersivo.
+        if (device.hasObject(By.text("Viewing full screen"))) device.findObject(By.text("Got it"))?.click()
         if (device.wait(Until.hasObject(By.desc("Opciones del documento")), 600)) return
         device.click(device.displayWidth / 2, device.displayHeight * 3 / 4)
         find(By.desc("Opciones del documento"))
@@ -150,7 +152,7 @@ class AppWorkflowTest {
         val scenario = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java))
         try {
             find(By.clazz("android.widget.EditText")).text = title
-            find(By.text(title)).click()
+            find(By.text(title).clazz("android.widget.TextView")).click()
             assertTrue(device.wait(Until.hasObject(By.desc("Mostrar herramientas")), 7_000))
             assertFalse(device.hasObject(By.text("Fuente")))
             find(By.desc("Mostrar herramientas")).click()
@@ -186,6 +188,7 @@ class AppWorkflowTest {
         val intent = Intent(context, MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/html").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val scenario = ActivityScenario.launch<MainActivity>(intent)
         try {
+            waitFor(scenario, "document.documentElement.dataset.hypermarkerMode", "VIEW")
             showChrome()
             device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)(Got it|Entendido|Aceptar)"))), 2000)?.click()
             assertFalse(device.hasObject(By.desc("Herramientas del documento")))

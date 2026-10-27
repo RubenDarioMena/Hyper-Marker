@@ -10,13 +10,14 @@ import '@milkdown/crepe/theme/frame.css';
 let crepe;
 let session;
 const send = (type, payload) => window.MarkdownBridge?.postMessage(JSON.stringify({type, sessionId:session, payload}));
-window.startEditor = async (source, sessionId) => {
+window.startEditor = async (source, sessionId, readOnly = false) => {
   session = sessionId;
   try {
     if (crepe) await crepe.destroy();
     // La barra flotante se sustituye por la barra nativa superior, que actúa sobre la misma selección.
     crepe = new Crepe({root:document.getElementById('editor'), defaultValue:source,
       features:{[Crepe.Feature.ImageBlock]:false, [Crepe.Feature.Latex]:false, [Crepe.Feature.Toolbar]:false, [Crepe.Feature.TopBar]:false, [Crepe.Feature.AI]:false}});
+    crepe.setReadonly(readOnly);
     crepe.on(listener => listener.markdownUpdated((_ctx, markdown) => send('change', {source:markdown})));
     await crepe.create();
     window.editorMarkdown = () => crepe.getMarkdown();

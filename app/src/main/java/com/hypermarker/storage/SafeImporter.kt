@@ -24,7 +24,7 @@ class ImportBudget(private val root: File, private val limits: ImportLimits) {
     fun destination(path: String, directory: Boolean = false): File {
         val normalized = PathGuard.normalize(path)
         require(++count <= limits.files) { "Demasiados archivos" }
-        require(paths.add(normalized.lowercase(Locale.ROOT))) { "Nombres duplicados en el proyecto: $path" }
+        require(paths.add(java.text.Normalizer.normalize(normalized, java.text.Normalizer.Form.NFC).lowercase(Locale.ROOT))) { "Nombres duplicados en el proyecto: $path" }
         return PathGuard.resolve(root, normalized).also {
             if (directory) require(it.mkdirs() || it.isDirectory) { "No se pudo crear directorio" }
             else { require(!it.exists()) { "Colisión de archivo" }; it.parentFile!!.mkdirs() }

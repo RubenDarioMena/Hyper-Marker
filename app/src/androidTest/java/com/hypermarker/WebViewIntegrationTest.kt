@@ -96,6 +96,49 @@ class WebViewIntegrationTest {
     }
     private inline fun Bitmap.useBitmap(block: (Bitmap) -> Unit) { try { block(this) } finally { recycle() } }
 
+    @Test fun remoteSnapshotCannotReadCredentialOrAnotherRealDocument() {
+        val auth = com.hypermarker.github.GitHubAuthStore(instrument.targetContext)
+        auth.save("github_pat_synthetic_isolation_123456789")
+        val other = runBlocking { repository.createMarkdown(null, "Private test", "PRIVATE_NATIVE_TEXT") }
+        extraDocuments += other.id
+        try {
+            val sha = "b".repeat(40)
+            val version = File(repository.directory(document.id), "remote-versions/$sha")
+            repository.original(document.id).copyRecursively(version)
+            repository.installRemoteVersion(document.id, sha)
+            attach(document)
+            evaluate("window.privateResults=[];Promise.all(['https://d${other.id}.hypermarker.invalid/markdown/source.md',location.origin+'/../../shared_prefs/github_auth.xml'].map(u=>fetch(u).then(r=>r.text()).catch(()=> 'blocked'))).then(v=>window.privateResults=v)")
+            val end = SystemClock.uptimeMillis() + 5_000
+            while ((decoded("window.privateResults.length") as Number).toInt() < 2 && SystemClock.uptimeMillis() < end) SystemClock.sleep(50)
+            assertEquals(2, (decoded("window.privateResults.length") as Number).toInt())
+            val result = decoded("JSON.stringify(window.privateResults)").toString()
+            assertFalse(result.contains("PRIVATE_NATIVE_TEXT")); assertFalse(result.contains("synthetic_isolation"))
+            assertFalse(result.contains("cipher")); assertFalse(result.contains("<map>"))
+            assertEquals("undefined", decoded("typeof window.GitHubAuthStore"))
+        } finally { auth.clear() }
+    }
+
+    @Test fun openRendererKeepsOneSnapshotWhileNewRendererUsesPublishedVersion() {
+        val sha = "a".repeat(40)
+        val version = File(repository.directory(document.id), "remote-versions/$sha")
+        repository.original(document.id).copyRecursively(version)
+        File(version, "data.json").writeText("{\"value\":99}")
+        repository.installRemoteVersion(document.id, sha)
+        fun fetchValue(): Int {
+            evaluate("window.snapshotValue=0;fetch('data.json').then(r=>r.json()).then(v=>window.snapshotValue=v.value)")
+            val end = SystemClock.uptimeMillis() + 5_000
+            while (SystemClock.uptimeMillis() < end) {
+                val value = evaluate("window.snapshotValue").toIntOrNull() ?: 0
+                if (value != 0) return value
+                SystemClock.sleep(50)
+            }
+            fail("Fetch local no respondió"); return 0
+        }
+        assertEquals(42, fetchValue())
+        attach(document)
+        assertEquals(99, fetchValue())
+    }
+
     @Test fun realLongPressHighlightsSlidesAndCommitsOnRelease() {
         mode("EDIT")
         val a = rect("a"); val b = rect("b"); val down = SystemClock.uptimeMillis()
