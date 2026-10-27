@@ -1,6 +1,6 @@
 # Progreso y relevo
 
-Última actualización: **2026-10-26** (America/Mexico_City).
+Última actualización: **2026-10-27** (America/Mexico_City).
 
 ## Estado real
 
@@ -114,3 +114,14 @@ Validación: comando/pasos, entorno, resultado, evidencia:
 Limitaciones/bloqueos y pruebas no ejecutadas:
 Siguiente paso concreto:
 ```
+
+## GitHub Sync: cierre de implementación y entrega al S24 (2026-10-27)
+
+- Alcance: terminar los pendientes de GitHub Sync. Posteriormente el propietario indicó «yo lo haré, pásalo al S24»: se entregó la build para su comprobación manual, conservando los fallos de automatización como pendientes.
+- Fuente de código: `899499ad55b64f3a7a62a8dbcdf14dbee5288f10`, rama `codex/github-sync`. Se conservaron e integraron los cambios locales de la implementación anterior; la especificación original sigue intacta (SHA-256 `c779db1ae246f5aba1e1084df4b0c7b3a4fc669ead8f4ded080846de5c44fdfb`).
+- Completado: panel de consumo por fuente/periodo, exportación anonimizada por SAF, espacio/CPU/batería y límites; paginación de ramas/repos; suspensión persistida de PAT rechazado; pantalla segura; worker público sin PAT y cancelación al desconectar; reloj monotónico/arranque y corrupción fail-closed; stream limitado por saldo antes de leer; exclusión mutua de publicación/copia/desvinculación/recuperación; limpieza de staging/versiones; renderer fijado a una generación; conservación de retirados. Corregida la carga de ramas desde owner/repo manual y la carrera al copiar Markdown remoto mientras se sincroniza.
+- Validación: **48/48 JVM**, **13/13 web**, `assembleDebug`, `assembleDebugAndroidTest` y `lintDebug` PASS (0 errores, 49 advertencias). GitHub público real: descarga, lista `main`, CSS/SVG/JS offline y reapertura del snapshot después de reiniciar el proceso PASS. WorkManager, Keystore sintético y aislamiento de contenido remoto PASS en Android.
+- **No se declara suite Android completa aprobada:** última corrida **21/24 PASS**, tres fallos (timeouts de evaluación en Markdown y flujo compartido de pines, y transacción de trazo no observada). Hubo resultados variables y ANR de System UI en el AVD anterior; no se atribuyen definitivamente los tres fallos finales al entorno ni al producto. Detalle en [docs/github-sync-validation.md](docs/github-sync-validation.md).
+- S24 Ultra: respaldo previo en `artifacts/phone-backup/s24-github-sync-2026-10-27_011640/` con dos TAR idénticos, extracción validada, SQLite íntegra y APK previo conservado. Firma idéntica; `adb install -r` PASS sin desinstalar. Migración v2→v3 conservó exactamente **6 carpetas, 6 documentos, 1 anotación, 4 preferencias, 2 puntos y 1 conexión**; todas sus filas iguales y **9 archivos canónicos** con el mismo SHA-256. La app quedó abierta para el propietario; no se instrumentó el teléfono personal.
+- APK instalado: `artifacts/Hyper-Marker-github-sync-debug.apk`, SHA-256 `d8db8249fa6fa895b57e9104dcc6f5796a60b2538585df2f1dba9488e07e6280`. El APK público de `downloads/` sigue siendo anterior a Sync, pendiente de aceptación; no se publica como verificado un reemplazo.
+- Siguiente paso concreto: el propietario prueba PAT privado, repo nuevo autorizado, rama de PR, actualización, revocación, Wi-Fi/datos, lectura offline tras reinicio y los flujos Markdown/pin/dibujo. Quedan accesibilidad y cadencia periódica real bajo Samsung. Registrar resultados antes de declarar aceptación completa o sustituir el APK descargable.

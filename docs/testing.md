@@ -108,6 +108,27 @@ Tareas disponibles desde la raíz (JDK 17 y SDK configurados):
 
 `connectedDebugAndroidTest` requiere un emulador/dispositivo. Un resultado sin tests ejecutados no es evidencia de cobertura. Si se usa CI, documentar preparación SDK/JDK, tareas, ruta de APK y recolección de artefactos; no afirmar generación en la nube hasta verificarla.
 
+## GitHub Sync (función adicional)
+
+La [especificación](../Hyper-Marker_GitHub_Sync_Spec_v1.md) define la aceptación completa. La implementación incremental y límites reales se registran en [proposals/github-sync.md](proposals/github-sync.md) y [progress.md](../progress.md). Estos casos no se marcan PASS por el solo hecho de compilar.
+
+| ID | Comprobación | Evidencia actual / pendiente |
+| --- | --- | --- |
+| SYNC-01/02 | Token limitado a repo A; repo nuevo autorizado después | Pendiente de prueba manual por el propietario en el S24. |
+| SYNC-03 | Elegir otra rama | Lista real `main` PASS; paginación y separación de identidad PASS JVM; rama real de PR pendiente. |
+| SYNC-04 | Abrir copia offline | PASS real con `fixtures/project`: modo avión, CSS/SVG y contador JS; reapertura offline después de reiniciar el proceso. |
+| SYNC-05/06 | SHA/ETag y actualización incremental sin perder anotaciones | PASS JVM con transporte falso, identidad/anotaciones y copias independientes; actualización real pendiente. |
+| SYNC-07/08 | Fallo de red, borrado y revocación | PASS JVM: stream parcial, 500/401/403/404/429, cancelación, retirados y recuperación; revocación privada real pendiente. |
+| SYNC-09/10 | Aislamiento de token, rutas y submódulos | PASS Android con token sintético y paquete remoto; PASS JVM de rutas, modos, colisiones, symlinks y submódulos. |
+| METRIC-01/03/04/05 | 304/429, cuotas, reapertura, corrupción y reloj | PASS JVM, incluidos bytes parciales, corrupción tipada/JSON, reparación conservadora y salto de reloj. Panel real abierto y métricas observadas. |
+| METRIC-02/06 | Recomposiciones, worker único y escala | PASS: 100 sync concurrentes coalescen, 100 programaciones mantienen un worker, árbol de 10.001 archivos se detiene antes de blobs. Cadencia OEM pendiente. |
+| SEC-GH-01 | Backup/log/export/token | Keystore sintético PASS; exportación anonimizada y persistencia PASS JVM; exclusiones de backup y ausencia de logging revisadas. PAT real se configura sólo en APK. |
+| REG-01 | V1 + Flow + migración | 48 JVM y 13 web PASS; conservación exacta de datos del S24 al migrar v2→v3 PASS. Última suite Android: 21/24 PASS, 3 FAIL (Markdown, flujo de pin y trazo); no se marca regresión completa PASS. |
+
+Reporte detallado, APK, respaldo y fallos abiertos: [github-sync-validation.md](github-sync-validation.md).
+
+No probar el PAT real mediante fixtures, comandos de terminal, screenshots ni tests versionados. Los tests GitHub automatizados usan `GitHubTransport` falso para no gastar cuota ni exponer datos.
+
 ## Registro de evidencia
 
 En `progress.md` o un reporte enlazado registrar: fecha, commit fuente, hito/casos, comando o pasos, resultado (PASS/FAIL/NO EJECUTADO), dispositivo/API Android, versión WebView, versiones de toolchain y ruta a evidencia cuando exista. Para PIN-01/02 se recomienda video o secuencia de capturas con pasos reproducibles. Para seguridad, registrar intento y ausencia del efecto prohibido, no sólo que no hubo crash.

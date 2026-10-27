@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Tu parte · GitHub en Hyper-Marker</title>
+  <style>
+    :root { font: 16px/1.55 system-ui, -apple-system, sans-serif; color: #183329; background: #f4f7f2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 880px; margin: auto; padding: clamp(20px, 5vw, 54px); }
+    header { padding: 34px; color: #f6fff9; background: linear-gradient(135deg, #174c3e, #28745a); border-radius: 24px; }
+    .eyebrow { letter-spacing: .12em; text-transform: uppercase; font-size: .76rem; font-weight: 700; opacity: .8; }
+    h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.12; margin: 14px 0; }
+    h2 { font-size: 1.35rem; margin: 0 0 14px; }
+    p { margin: 8px 0 14px; }
+    .lede { font-size: 1.08rem; max-width: 60ch; }
+    .card { background: #fff; border: 1px solid #dce7dd; border-radius: 18px; padding: 25px 28px; margin-top: 18px; box-shadow: 0 8px 24px #153d2610; }
+    .step { display: inline-grid; place-items: center; background: #d8efe2; color: #16543e; width: 31px; height: 31px; border-radius: 50%; margin-right: 7px; font-weight: 750; }
+    ul, ol { padding-left: 1.5em; }
+    li { margin: 8px 0; }
+    label { display: flex; gap: 10px; align-items: start; cursor: pointer; }
+    input[type=checkbox] { width: 19px; height: 19px; margin-top: 3px; accent-color: #206d51; flex: none; }
+    a { color: #116746; font-weight: 650; }
+    code { padding: 2px 5px; border-radius: 5px; background: #e9f0e9; overflow-wrap: anywhere; }
+    .note { border-left: 4px solid #db9c2b; padding: 10px 15px; background: #fff8e8; border-radius: 0 9px 9px 0; }
+    .danger { border-left-color: #bd5644; background: #fff0ec; }
+    footer { margin: 28px 4px 0; color: #496155; font-size: .9rem; }
+    @media (prefers-color-scheme: dark) {
+      :root { color: #e5f4e9; background: #111b17; }
+      .card { background: #1a2922; border-color: #2d483a; box-shadow: none; }
+      .step { background: #25573f; color: #e5ffef; }
+      a { color: #88ddae; }
+      code { background: #294234; }
+      .note { background: #342b1c; }
+      .danger { background: #35231f; }
+      footer { color: #abc5b3; }
+    }
+  </style>
+</head>
+<body><main>
+  <header>
+    <div class="eyebrow">Hyper-Marker · Guía del propietario</div>
+    <h1>Tu parte para probar la sincronización con GitHub</h1>
+    <p class="lede">Prepara un repositorio pequeño, conserva los datos de tu teléfono y crea la credencial únicamente cuando la APK ya tenga el campo seguro. La app descargará documentos para leerlos sin conexión; tus notas y anotaciones seguirán locales.</p>
+  </header>
+
+  <section class="card"><h2><span class="step">1</span> Ahora: elegir contenido de prueba</h2>
+    <ul>
+      <li><label><input type="checkbox">Elegir un repositorio piloto. Candidato: <code>RubenDarioMena/Codemageddon</code>, si existe y tiene una carpeta pequeña con Markdown o HTML compilado.</label></li>
+      <li><label><input type="checkbox">Anotar el nombre exacto del repositorio, la rama y la ruta de carpeta. Para un PR aún sin fusionar, anotar su rama: sus cambios no aparecerán en <code>main</code>.</label></li>
+      <li><label><input type="checkbox">Elegir si también probarás un repositorio privado de prueba, sin secretos ni datos de empresa.</label></li>
+      <li><label><input type="checkbox">Si probarás HTML, preparar una carpeta de salida con <code>index.html</code>, CSS, JS ya compilado e imágenes con rutas relativas. El código <code>.tsx</code>/<code>.jsx</code> sin compilar no se ejecuta en la app.</label></li>
+    </ul>
+    <p>Al comunicar la selección al agente basta con <strong>repositorio, rama y carpeta</strong>. No hace falta dar acceso ni credenciales en el chat.</p>
+  </section>
+
+  <section class="card"><h2><span class="step">2</span> Antes de instalar la APK</h2>
+    <ul>
+      <li><label><input type="checkbox">Respaldar los datos actuales de Hyper-Marker del teléfono y comprobar que la copia se puede restaurar.</label></li>
+      <li><label><input type="checkbox">Comparar la firma de la APK nueva con la instalada antes de actualizar. Si Android muestra <code>INSTALL_FAILED_UPDATE_INCOMPATIBLE</code>, detenerse: desinstalar puede borrar documentos, Flow Dots y anotaciones.</label></li>
+    </ul>
+    <p class="note danger"><strong>No desinstales para resolver un error de firma</strong> hasta tener respaldo verificado y un plan de restauración. El certificado debug puede cambiar entre computadoras.</p>
+  </section>
+
+  <section class="card"><h2><span class="step">3</span> Cuando la app ofrezca «Conectar GitHub»</h2>
+    <ol>
+      <li>Desde un navegador de confianza, abre <a href="https://github.com/settings/personal-access-tokens/new">GitHub · Fine-grained personal access tokens</a> e inicia sesión.</li>
+      <li>Elige el <em>Resource owner</em> correcto, <strong>Only select repositories</strong> y únicamente los repositorios de prueba.</li>
+      <li>Concede <strong>Contents: Read-only</strong> y <strong>Metadata: Read-only</strong>. No concedas escritura, Actions ni Administration. Usa un nombre como <code>Hyper-Marker Android Read Only</code> y una expiración razonable.</li>
+      <li>Pega el token directamente en el campo seguro de la APK. Después selecciona repo, rama y carpeta dentro de Hyper-Marker.</li>
+    </ol>
+    <p class="note danger"><strong>Nunca pegues el token en Codex/ChatGPT, issues, capturas, commits o este HTML.</strong> Si un repo nuevo no aparece, revisa su autorización en los ajustes del token de GitHub y actualiza la lista en la app.</p>
+  </section>
+
+  <section class="card"><h2><span class="step">4</span> Prueba de aceptación en el teléfono</h2>
+    <ul>
+      <li><label><input type="checkbox">Sincronizar manualmente una carpeta en <code>main</code>; activar modo avión y abrir el Markdown o HTML desde la copia local.</label></li>
+      <li><label><input type="checkbox">Pedir a Codex Cloud cambiar un <code>.md</code> pequeño en una rama conocida; escoger esa rama en la app, actualizar y comprobar el cambio. Un PR sin fusionar no cambia <code>main</code>.</label></li>
+      <li><label><input type="checkbox">Abrir un HTML con recursos relativos offline y comprobar que conserva CSS, JS e imágenes compatibles.</label></li>
+      <li><label><input type="checkbox">Añadir una anotación local a un HTML; actualizar el remoto y comprobar que la anotación permanece. Las notas locales no deben subirse ni sobrescribirse.</label></li>
+      <li><label><input type="checkbox">Revisar «Sincronización y consumo»: peticiones, bytes, errores, límites y última actualización. Comprobar que un refresco repetido respeta la pausa indicada.</label></li>
+      <li><label><input type="checkbox">Probar con Wi-Fi, modo avión y, si te conviene, datos móviles; anotar la versión de Android, la carpeta y cualquier error exacto sin mostrar el token.</label></li>
+    </ul>
+  </section>
+
+  <section class="card"><h2><span class="step">5</span> Al terminar las pruebas</h2>
+    <p>Si ya no usarás la conexión, revoca el token desde <a href="https://github.com/settings/personal-access-tokens">GitHub · tus tokens</a> y desconecta la cuenta en Hyper-Marker. Desconectar la app elimina la credencial local; la revocación del token ocurre en GitHub.</p>
+    <p>Comparte el resultado de cada prueba, la rama y el tipo de archivo. Nunca incluyas la credencial ni rutas privadas completas en capturas o reportes.</p>
+  </section>
+  <footer>Lista imprimible y local: las casillas no guardan información. Basada en <a href="../Hyper-Marker_GitHub_Sync_Spec_v1.md">la especificación de sincronización</a>. La disponibilidad de cada paso de la app depende del hito implementado y validado.</footer>
+</main></body></html>

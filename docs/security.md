@@ -44,3 +44,19 @@ La página comparte contexto con el controlador: una sesión no es un secreto fr
 Consola limitada a 300 entradas, imports por streaming, recálculos DOM agrupados, persistencia por trazo/operación e historial de edición acotado. Una caída del renderer no elimina originales ni notas guardadas. Errores de guardado dejan estado pendiente y permiten reintentar.
 
 HTML puede consumir recursos, cambiar su DOM o interferir visualmente con overlays. No se garantiza identidad semántica de objetos canvas, recuperación de DOM arbitrariamente cambiante ni alineación de dibujos después del reflujo. El aislamiento y las APIs web dependen del proveedor instalado. Los límites se prueban con contenido sintético; no se prometen privilegios o compatibilidad que no hayan sido verificados.
+
+## GitHub como fuente remota adicional
+
+La [integración GitHub](proposals/github-sync.md) usa `INTERNET` en Android, sin cambiar la política OFFLINE de cada WebView. El token permanece cifrado en almacenamiento privado con clave Android Keystore; no se entrega al bridge, al contenido HTML, al APK, a Room ni a los logs. `allowBackup=false` y las reglas de extracción siguen excluyendo archivos, base y preferencias. Desconectar borra el secreto local y cancela el worker global; revocar el token remoto corresponde a GitHub.
+
+El cliente medido fija `api.github.com` por HTTPS, deshabilita redirecciones, limita respuesta y tiempos, y separa los límites propios de los encabezados `X-RateLimit-*`. El motor rechaza symlinks/submódulos, paths inseguros, colisiones normalizadas, SHA de blobs distintos y archivos demasiado grandes; no publica un paquete HTML si faltan recursos relativos detectables. Descargas parciales viven en staging privado. La carpeta remota de biblioteca y sus documentos no se editan directamente; copiar crea un documento local. Un `401/403/404` no elimina la copia previa.
+
+Límite residual: las dependencias web construidas dinámicamente en JavaScript no se pueden inferir por completo del HTML/CSS; el verificador sólo comprueba referencias estáticas. El contenido sincronizado sigue siendo no confiable aunque provenga de un repositorio privado. Deben repetirse las pruebas de WebView y bridge con un paquete remoto hostil antes de declarar la función aceptada.
+
+### Refuerzos de sincronización
+
+La pantalla de conexión aplica `FLAG_SECURE` mientras está abierta y usa entrada de contraseña; el token sólo se valida y cifra tras una respuesta autorizada. Una credencial rechazada queda suspendida de forma persistente; sustituirla exige validar la nueva. Desconectar cancela el worker y sync activo, borra la clave/credencial y desactiva las fuentes automáticas; conserva las copias offline.
+
+La enumeración remota rechaza modos Git no permitidos, árboles truncados, paths hostiles, symlinks, submódulos y colisiones por mayúsculas o normalización Unicode antes de descargar blobs. El límite total incluye generaciones antiguas que todavía puedan estar en uso. La compensación elimina también directorios creados parcialmente antes de una publicación fallida. Ninguna exportación de consumo incluye secretos, contenido de documentos ni identificadores de repositorios o rutas privadas.
+
+El presupuesto detecta cambios incompatibles entre reloj civil y monotónico dentro de un mismo arranque, además del retroceso persistido. El reloj civil entre arranques depende del reloj de Android; no existe una autoridad de tiempo externa de la app. Ante corrupción del presupuesto la reparación no libera una cuota desconocida: aplica una espera de 24 h. Los bytes mostrados corresponden a cuerpos entregados por el transporte, no a cabeceras, TLS ni consumo facturado.

@@ -15,6 +15,7 @@ Aplicación Android nativa para organizar proyectos HTML interactivos y notas Ma
 - Edición del texto visible como sustitución separada del HTML original, con restauración por elemento o desde la lista de notas y cambios.
 - Pluma, resaltador, borrador, colores, anchos, undo/redo y limpieza confirmada; datos separados del HTML.
 - Modo offline por defecto y permiso explícito para recursos de red por documento.
+- GitHub Sync en `codex/github-sync`: selección de carpeta GitHub pública o autorizada por PAT, copia offline de Markdown/HTML compilado, refresco manual y periódico optativo, límites de consumo y credencial cifrada. La aceptación física con PAT del propietario sigue pendiente; ver [propuesta y evidencias](docs/proposals/github-sync.md).
 
 ## Compilar
 
@@ -31,6 +32,8 @@ Configurar `JAVA_HOME` y `ANDROID_HOME`, o el SDK en `local.properties` (ignorad
 
 El APK para pruebas se puede descargar desde [downloads/Hyper-Marker-1.0.0-debug.apk](downloads/Hyper-Marker-1.0.0-debug.apk?raw=1). Su [registro de entrega](downloads/README.md) identifica fuente, hash, firma y comprobaciones. Se versiona esta copia por solicitud explícita del propietario; los demás APK, SDK, caches y claves siguen siendo archivos locales.
 
+**El APK de `downloads/` es anterior a GitHub Sync.** Para probar esta rama hay que compilar su código, revisar firma y respaldar los datos antes de instalarlo en un teléfono.
+
 La copia local original de entrega se documenta en `artifacts/Hyper-Marker-1.0.0-debug.apk`, acompañada de `.apk.sha256`; los detalles de esa fuente limpia, firma e instalación están en [docs/validation.md](docs/validation.md). El APK debug se genera normalmente en `app/build/outputs/apk/debug/app-debug.apk`, applicationId `com.hypermarker`, versión `1.0.0` (1). No se incluyen claves privadas en Git. El workflow [Android debug](.github/workflows/android.yml) ejecuta tests JVM, lint y build y recopila APK/reportes como artefacto; consultar el resultado de la ejecución, no asumir éxito por la existencia del YAML.
 
 ## Usar
@@ -42,6 +45,8 @@ La copia local original de entrega se documenta en `artifacts/Hyper-Marker-1.0.0
 5. En Editar, mantén y desliza sobre el contenido; al soltar, el elemento queda resaltado y la cruceta actúa sobre él. Guardar crea el pin; cancelar deja el documento intacto. También existe selección de elemento sin pulsación prolongada desde el menú. La lista de notas y cambios permite abrir, mover y reanclar notas sin ancla y restaurar textos.
 6. En Dibujar, dibuja o borra trazos; un toque breve con el dedo muestra los controles y no deja un punto. Volver a Ver restituye la interacción normal de la página. Las notas Markdown se editan desde la biblioteca o se crean desde el lector.
 7. Hay un ejemplo local en la biblioteca vacía y un conjunto de [fixtures](fixtures/README.md) para probar imports, React compilado, canvas, Markdown y casos maliciosos.
+
+Para GitHub Sync, abre `+ → Añadir carpeta de GitHub`; puedes probar un repositorio público sin token o conectar un PAT fine-grained desde el campo seguro. Elige repo, rama y carpeta; el contenido remoto es de solo lectura y una copia editable se crea por separado. La [guía HTML del propietario](docs/guia-github-sync.html) explica preparación, permisos mínimos, respaldo del teléfono y pruebas de aceptación. No envíes un PAT al chat ni a Git.
 
 ## Verificar
 
@@ -75,7 +80,7 @@ Los tests web abren Chrome en un perfil temporal. En macOS usan Google Chrome; e
 - Visual cubre Markdown ordinario y tablas GFM bien formadas (Visual normaliza el relleno de columnas y usa `*` en listas). HTML, imágenes, tablas incompletas, referencias y extensiones no preservables permanecen en Fuente con aviso. El autoguardado tiene una ventana de unos 500 ms; salir guarda explícitamente.
 - En Ver, la pulsación prolongada abre la cruceta en lugar de la selección de texto nativa del WebView. Los botones de cristal son translúcidos con tono adaptado al fondo; Compose no puede desenfocar el WebView situado detrás, así que no hay desenfoque real.
 - La edición de texto sustituye el texto visible del elemento (formato interno incluido) sin tocar el archivo. En SPAs que vuelven a renderizar, la sustitución se reaplica como mejor esfuerzo y, si el contenido cambia, queda sin coincidencia.
-- RAR, exportación/backup, sincronización e inspector avanzado son posteriores.
+- RAR, exportación/backup e inspector avanzado son posteriores. GitHub Sync descarga documentos de solo lectura; no sincroniza Flow Dots ni escribe en GitHub. La verificación final en el Samsung está pendiente.
 
 ## Continuar el proyecto
 

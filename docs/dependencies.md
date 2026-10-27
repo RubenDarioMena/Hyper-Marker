@@ -16,6 +16,7 @@ La implementación inicial usa un módulo `app`, namespace/applicationId `com.hy
 | Room | 2.7.1 | Persistencia y esquema v1 exportado en `app/schemas/`. Apache-2.0. |
 | AndroidX WebKit | 1.14.0 | AssetLoader, mensajes con origen/frame y controles de service workers. Apache-2.0. |
 | DocumentFile | 1.0.1 | Acceso SAF a árboles. Apache-2.0. |
+| AndroidX WorkManager Runtime KTX | 2.12.0 | Un solo trabajo periódico para GitHub Sync; API mínima 24, compatible con la mínima 26 de la app. Apache-2.0. Dependencia nueva de esta rama, compilada en emulador Android 16. |
 | Apache Commons Compress | 1.28.0 | ZIP con atributos Unix, rechazo de symlinks y control de entradas. Apache-2.0 y avisos incluidos. |
 | Milkdown Crepe / kit / utils | 7.22.3 | Editor visual Markdown local basado en ProseMirror; `kit` aporta los comandos de formato usados por la barra superior. MIT; dependencias transitivas y textos completos en `assets/licenses/WEB.txt`. |
 | esbuild | 0.28.2 | Genera el bundle local del editor. MIT, herramienta de desarrollo. |
@@ -36,6 +37,7 @@ Las licencias se incluyen como assets del APK y se consultan desde el menú `+` 
 
 - [Compatibilidad AGP 8.12 / Gradle / JDK / API 36](https://developer.android.com/build/releases/agp-8-12-0-release-notes).
 - [Room y releases](https://developer.android.com/jetpack/androidx/releases/room), [WebKit y releases](https://developer.android.com/jetpack/androidx/releases/webkit).
+- [WorkManager 2.12.0](https://developer.android.com/jetpack/androidx/releases/work) y [trabajo periódico con restricciones](https://developer.android.com/develop/background-work/background-tasks/persistent/getting-started/define-work).
 - [Mensajería de WebViewCompat](https://developer.android.com/reference/androidx/webkit/WebViewCompat).
 - [Milkdown Crepe](https://milkdown.dev/docs/guide/using-crepe) y código/tipos del paquete fijado en el lockfile.
 - [Licencia de remark-math](https://github.com/remarkjs/remark-math/blob/main/license).
