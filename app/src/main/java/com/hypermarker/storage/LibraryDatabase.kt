@@ -10,7 +10,7 @@ data class Folder(@PrimaryKey val id: String, val parentId: String?, val name: S
 
 @Entity(tableName = "documents", foreignKeys = [ForeignKey(entity = Folder::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE)], indices = [Index("folderId")])
 data class Document(@PrimaryKey val id: String, val folderId: String?, val title: String, val type: String,
-    val entryPath: String? = null, val networkAllowed: Boolean = false, val revision: Int = 1,
+    val entryPath: String? = null, val networkAllowed: Boolean = true, val revision: Int = 1,
     val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis())
 
 @Entity(tableName = "annotations", foreignKeys = [ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE)], indices = [Index("documentId")])

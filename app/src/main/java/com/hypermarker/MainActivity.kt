@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import com.hypermarker.browser.BrowserScreen
 import com.hypermarker.flow.FlowScreen
 import com.hypermarker.github.GitHubAddScreen
 import com.hypermarker.github.RemoteMarkdownScreen
@@ -33,10 +34,12 @@ class MainActivity : ComponentActivity() {
                 val document = docs.firstOrNull { it.id == model.openedId }
                 Surface(color = MaterialTheme.colorScheme.background) {
                     when {
+                        model.browserScreen -> BrowserScreen(model.repository, model.browserUrl, model.folderId,
+                            onClose = { model.browserScreen = false }, onSaved = { model.browserScreen = false; model.openedId = it })
                         model.githubScreen -> GitHubAddScreen(model)
                         document?.type == "REMOTE_MARKDOWN" -> RemoteMarkdownScreen(document, model.repository,
                             onClose = { model.openedId = null }, onCopy = { model.openedId = it })
-                        document?.type == "HTML" -> ReaderScreen(document, model.repository, onClose = { model.openedId = null },
+                        (document?.type == "HTML" || document?.type == "WEB_SNAPSHOT") -> ReaderScreen(requireNotNull(document), model.repository, onClose = { model.openedId = null }, onBrowse = model::browse,
                             onMarkdown = { model.action { model.openedId = model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id } })
                         document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = { model.openedId = null })
                         document?.type == "FLOW" -> FlowScreen(document, model.repository, onClose = { model.openedId = null })
@@ -49,6 +52,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); receive(intent) }
     @Suppress("DEPRECATION")
     private fun receive(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) {
+            intent.data?.takeIf { it.scheme in listOf("content", "file") }?.let {
+                model.browserScreen = false; model.githubScreen = false; model.receive(listOf(it))
+            }
+            return
+        }
         if (intent?.action !in listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)) return
         val values = if (intent?.action == Intent.ACTION_SEND_MULTIPLE) intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()
             else listOfNotNull(intent?.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))

@@ -62,6 +62,7 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
     suspend fun recover() = write {
         if (recovered) return@write
         File(context.filesDir, "imports").deleteRecursively()
+        File(context.cacheDir, "web-captures").deleteRecursively()
         val existing = dao.documents().map { it.id }.toSet()
         File(context.filesDir, "documents").listFiles()?.filter { it.name !in existing }?.forEach { it.deleteRecursively() }
         dao.remoteFolders().forEach { remote ->
@@ -141,6 +142,25 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
             dao.put(doc); doc
         } catch (error: Throwable) { destination.deleteRecursively(); pending.directory.deleteRecursively(); throw error }
     }
+    suspend fun saveWebSnapshot(archive: File, source: String, title: String, parent: String?): Document = write {
+        checkParent(parent)
+        val document = Document(id(), parent, name(title), "WEB_SNAPSHOT", "index.html", networkAllowed = false)
+        try {
+            val root = directory(document.id)
+            com.hypermarker.browser.WebSnapshot.extract(archive, original(document.id), source)
+            val preserved = File(root, "capture/page.mhtml").apply { parentFile!!.mkdirs() }
+            archive.copyTo(preserved)
+            atomicWrite(File(root, "web-source.json"), org.json.JSONObject().put("url", source)
+                .put("savedAt", document.createdAt).toString())
+            dao.put(document)
+            document
+        } catch (error: Throwable) { directory(document.id).deleteRecursively(); throw error }
+    }
+    suspend fun webSource(id: String): String? = withContext(Dispatchers.IO) {
+        if (dao.document(id)?.type != "WEB_SNAPSHOT") return@withContext null
+        runCatching { org.json.JSONObject(File(directory(id), "web-source.json").readText()).getString("url") }
+            .getOrNull()?.takeIf(com.hypermarker.browser.WebAddress::permitted)
+    }
     suspend fun rename(id: String, folder: Boolean, title: String) = write {
         require(if (folder) dao.remoteFolderForLibrary(id) == null else dao.remoteEntryForDocument(id) == null) { "El contenido GitHub es de solo lectura" }
         if (folder) dao.put(requireNotNull(dao.folder(id)).copy(name = name(title)))
@@ -192,7 +212,11 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
             }
         } catch (error: Throwable) { created.forEach { directory(it).deleteRecursively() }; throw error }
     }
-    suspend fun setNetwork(id: String, allowed: Boolean) = write { dao.put(requireNotNull(dao.document(id)).copy(networkAllowed = allowed)) }
+    suspend fun setNetwork(id: String, allowed: Boolean) = write {
+        val doc = requireNotNull(dao.document(id))
+        require(doc.type != "WEB_SNAPSHOT" || !allowed) { "Las copias descargadas permanecen sin conexión; abre la página original para navegar" }
+        dao.put(doc.copy(networkAllowed = allowed))
+    }
     suspend fun copyRemoteMarkdown(id: String): Document = write {
         val doc = requireNotNull(dao.document(id)) { "El documento ya no existe" }
         require(doc.type == "REMOTE_MARKDOWN")

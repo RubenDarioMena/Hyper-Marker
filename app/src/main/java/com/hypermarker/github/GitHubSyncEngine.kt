@@ -207,7 +207,7 @@ class GitHubSyncEngine(
                         val prior = dao.document(htmlId)
                         dao.put(Document(htmlId, source.folderId, "${source.repo} · HTML", "HTML", htmlEntry,
                             createdAt = prior?.createdAt ?: now, updatedAt = now, revision = (prior?.revision ?: 0) + 1,
-                            networkAllowed = prior?.networkAllowed ?: false))
+                            networkAllowed = prior?.networkAllowed ?: true))
                     }
                     for (item in markdown) {
                         val docId = old[item.path]?.documentId ?: identity(id, item.path)

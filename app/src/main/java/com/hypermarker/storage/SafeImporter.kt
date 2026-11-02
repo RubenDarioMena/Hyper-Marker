@@ -49,9 +49,17 @@ class ImportBudget(private val root: File, private val limits: ImportLimits) {
 
 class SafeImporter(private val context: Context, private val limits: ImportLimits = ImportLimits()) {
     private val stagingRoot get() = File(context.filesDir, "imports").apply { mkdirs() }
-    fun displayName(uri: Uri): String = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-        if (it.moveToFirst()) it.getString(0) else null
-    } ?: "documento.html"
+    fun displayName(uri: Uri): String {
+        require(uri.scheme in listOf("content", "file")) { "Elige un archivo desde el selector de Android" }
+        if (uri.scheme == "file") {
+            val file = File(requireNotNull(uri.path)).canonicalFile
+            require(file.path.startsWith(File("/storage").canonicalPath + File.separator)) { "No se permite importar rutas privadas del sistema" }
+            return file.name
+        }
+        return context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        } ?: "documento.html"
+    }
 
     suspend fun prepare(uris: List<Uri>, tree: Boolean = false): PendingImport {
         require(uris.isNotEmpty()) { "No se recibió ningún archivo" }
@@ -78,7 +86,7 @@ class SafeImporter(private val context: Context, private val limits: ImportLimit
                     context.contentResolver.openInputStream(uri).use { input -> budget.copy(requireNotNull(input) { "No se pudo leer archivo" }, target) }
                 }
             }
-            val entries = root.walkTopDown().filter { it.isFile && (it.extension.equals("html", true) || it.extension.equals("htm", true)) }
+            val entries = root.walkTopDown().filter { it.isFile && it.extension.lowercase() in setOf("html", "htm", "xhtml") }
                 .map { it.relativeTo(root).invariantSeparatorsPath }.sorted().toList()
             require(entries.isNotEmpty()) { "No se encontró HTML; importa la carpeta o el ZIP que contiene index.html" }
             val indexes = entries.filter { it.substringAfterLast('/').equals("index.html", true) }

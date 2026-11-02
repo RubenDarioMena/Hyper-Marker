@@ -1,6 +1,6 @@
 # Progreso y relevo
 
-Última actualización: **2026-10-27** (America/Mexico_City).
+Última actualización: **2026-11-02** (America/Mexico_City).
 
 ## Estado real
 
@@ -125,3 +125,24 @@ Siguiente paso concreto:
 - S24 Ultra: respaldo previo en `artifacts/phone-backup/s24-github-sync-2026-10-27_011640/` con dos TAR idénticos, extracción validada, SQLite íntegra y APK previo conservado. Firma idéntica; `adb install -r` PASS sin desinstalar. Migración v2→v3 conservó exactamente **6 carpetas, 6 documentos, 1 anotación, 4 preferencias, 2 puntos y 1 conexión**; todas sus filas iguales y **9 archivos canónicos** con el mismo SHA-256. La app quedó abierta para el propietario; no se instrumentó el teléfono personal.
 - APK instalado: `artifacts/Hyper-Marker-github-sync-debug.apk`, SHA-256 `d8db8249fa6fa895b57e9104dcc6f5796a60b2538585df2f1dba9488e07e6280`. El APK público de `downloads/` sigue siendo anterior a Sync, pendiente de aceptación; no se publica como verificado un reemplazo.
 - Siguiente paso concreto: el propietario prueba PAT privado, repo nuevo autorizado, rama de PR, actualización, revocación, Wi-Fi/datos, lectura offline tras reinicio y los flujos Markdown/pin/dibujo. Quedan accesibilidad y cadencia periódica real bajo Samsung. Registrar resultados antes de declarar aceptación completa o sustituir el APK descargable.
+
+## Navegador HTTPS, copias offline, Abrir con e instalación S24 (2026-11-02)
+
+- Fuente: `codex/github-sync`, base `d6c6e5e`, árbol limpio al comenzar. Implementación y documentación sin commit al cierre; no se publicó ni reemplazó el APK de `downloads/`.
+- **Autorización explícita:** navegador con barra de búsqueda/URL, HTTPS por defecto, descargar la página actual para estudiar sin conexión; posteriormente «Abrir con» HTML e instalación en el Android conectado. Decisión separada en [web-browser.md](docs/proposals/web-browser.md); especificación original intacta.
+- Implementado: `BrowserScreen`/`BrowserViewModel`/`BrowserWebView`, búsqueda DuckDuckGo o dominio/URL HTTPS, back/forward/reload, entrada desde biblioteca/menú y enlaces tocados del lector. Navegador sin bridge, AssetLoader, accesos de archivo ni permisos web. Los HTML nuevos (incluidos los nuevos paquetes GitHub) permiten recursos HTTPS/WSS; se respetan preferencias anteriores. Duplicados/copias locales conservan su comportamiento offline.
+- Descarga: MHTML real de Chromium, original conservado aparte, conversión limitada a proyecto local con CSS/imágenes y referencias reescritas. Publicación compensada de `WEB_SNAPSHOT` en carpeta actual, apertura en lector con anotaciones separadas y enlace a la página original. Las capturas nunca habilitan red ni scripts originales; se impone también ante una preferencia inconsistente. No dependen de caché. Sin migración Room.
+- Android: filtro `ACTION_VIEW` para `text/html` / `application/xhtml+xml`, URI de contenido/archivo; importación privada HTML/HTM/XHTML. Rutas `file://` canónicas limitadas a `/storage/`; ningún permiso general de archivos nuevo.
+- Validación: **52/52 JVM**, **13/13 web**, `assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` **PASS** (0 errores, 34 advertencias). **22/22 Android dirigidas** en emulador API 36, WebView 156.0.8078.47, 4 GiB; navegador repetido **4/4** tras añadir aserción de ausencia de bridge. Captura/reapertura real con CSS/imagen/texto dinámico, bloqueo de scripts/red, Abrir con HTM y regresiones de pines/dibujos/importación PASS. UI pública HTTPS → descargar → biblioteca → modo avión → reiniciar proceso → leer copia PASS. No se declara suite Android completa ni aceptación V1. [Reporte](docs/web-browser-validation.md).
+- APK local `artifacts/Hyper-Marker-web-offline-debug.apk`, SHA-256 `0b4de7c29e8a0b498ba01929168c7caa9f51c73c875f9d67b62ddcadf63457da`, firma verificada. Entorno real: JBR 21.0.10 de Android Studio, Gradle 8.13/SDK 36, bytecode configurado a 17.
+- S24 Ultra SM-S928U Android 16: firma compatible; respaldo previo verificado en `artifacts/phone-backup/s24-web-offline-2026-11-02_151404/`. Instalación `-r` **Success**, sin desinstalar. Antes/después se conservaron todas las filas (**11 documentos, 9 carpetas, 1 anotación, 9 preferencias, 2 puntos, 1 conexión, 1 fuente remota**) y **267 archivos privados** idénticos. Hash del APK extraído del teléfono igual al validado. Resolución `ACTION_VIEW text/html`, proceso y actividad en primer plano PASS. No se instrumentó el teléfono personal.
+- Límites: captura estática de recursos ya cargados; sin garantía para vídeos/canvas/frames ni funciones del servidor. Navegador sin cookies/sesiones persistentes; algunos sitios autenticados no funcionarán. `saveWebArchive` no admite cuota/cancelación mientras escribe; el límite de 32 MiB se comprueba al convertir, con timeout y limpieza. Historial tras rotación, accesibilidad, API 26 y gestores SAF adicionales no comprobados.
+- **Siguiente paso concreto:** el propietario prueba «Abrir con» desde su gestor habitual, sus URL reales y una descarga seguida de modo avión. Después registrar aceptación/ajustes y revisar el diff para un commit; el APK público y pendientes de V1/Sync siguen sin declararse aceptados.
+
+## Samsung Tab: instalación completada (2026-11-02)
+
+- Samsung SM-P613. Respaldo previo TAR legible y APK anterior conservados en `artifacts/phone-backup/tab-web-offline-20261102-152147/`. La firma anterior era incompatible; con autorización explícita se desinstaló. Una desconexión USB interrumpió el primer intento de instalación nueva. Tras reconectar, `adb -s <tablet> install -r artifacts/Hyper-Marker-web-offline-debug.apk`: Success. `am start -W`: Status ok, arranque COLD en 2637 ms; proceso activo comprobado. Instalación limpia, sin restaurar el respaldo. No se ejecutaron pruebas instrumentadas en la tablet. Siguiente paso: probar páginas reales, descarga offline y Abrir con desde el gestor de archivos.
+
+## Publicación al repositorio (2026-11-02)
+
+- Por solicitud explícita del propietario se prepara commit y push de navegador HTTPS, capturas offline, Abrir con HTML, pruebas y documentación en `codex/github-sync`. Remoto comprobado sin divergencia antes de publicar. Se conservan las validaciones anteriores (52 JVM, 13 web, 22 Android dirigidas); no hubo cambios de código posteriores a esas comprobaciones. Respaldos, APK locales y datos personales quedan fuera del commit. La copia pública de `downloads/` continúa siendo la anterior. Siguiente paso: comprobar aceptación de uso en S24/Tab y resultados de CI remota, sin darla por aprobada por el solo push.

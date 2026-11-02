@@ -23,9 +23,11 @@ import kotlin.math.roundToInt
 @SuppressLint("SetJavaScriptEnabled")
 class DocumentWebView(context: Context, val document: Document, private val repository: LibraryRepository,
     private val event: (JSONObject) -> Unit, private val console: (String) -> Unit,
-    private val finished: (DocumentWebView) -> Unit, private val crashed: () -> Unit) : WebView(context) {
+    private val finished: (DocumentWebView) -> Unit, private val crashed: () -> Unit,
+    private val navigate: (String) -> Unit = {}) : WebView(context) {
     // Un renderer conserva una sola generación aunque sync publique otra mientras está abierto.
     private val contentRoot = repository.original(document.id)
+    private val networkAllowed = document.networkAllowed && document.type != "WEB_SNAPSHOT"
     val origin = "https://d${document.id}.hypermarker.invalid"
     var sessionId = UUID.randomUUID().toString()
     private var validator = BridgeValidator(sessionId, document.id, document.revision)
@@ -53,7 +55,7 @@ class DocumentWebView(context: Context, val document: Document, private val repo
     init {
         settings.apply {
             javaScriptEnabled = earlyScriptAvailable
-            blockNetworkLoads = !document.networkAllowed
+            blockNetworkLoads = !networkAllowed
             domStorageEnabled = false
             allowFileAccess = false
             allowContentAccess = false
@@ -114,12 +116,15 @@ class DocumentWebView(context: Context, val document: Document, private val repo
                 val uri = request.url
                 if (uri.scheme == "https" && uri.host == Uri.parse(origin).host) return localAssets.shouldInterceptRequest(uri) ?: denied()
                 if (uri.host?.endsWith(".hypermarker.invalid") == true) return denied()
-                return if (document.networkAllowed && uri.scheme == "https") null else denied()
+                return if (networkAllowed && uri.scheme == "https") null else denied()
             }
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest): Boolean {
                 val uri = request.url
                 val permitted = uri.scheme == "https" && uri.host == Uri.parse(origin).host
-                if (!permitted && request.isForMainFrame) console("Navegación externa bloqueada. Mantén el proyecto abierto; los recursos HTTPS requieren permiso por documento.")
+                if (!permitted && request.isForMainFrame) {
+                    if (request.hasGesture() && com.hypermarker.browser.WebAddress.permitted(uri.toString())) post { navigate(uri.toString()) }
+                    else console("Navegación externa bloqueada. Abre el navegador desde el menú o toca un enlace HTTPS.")
+                }
                 return !permitted
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) { mode = "VIEW"; sessionId = UUID.randomUUID().toString(); validator = BridgeValidator(sessionId, document.id, document.revision) }
@@ -182,7 +187,7 @@ class DocumentWebView(context: Context, val document: Document, private val repo
                 val top = (region.top * factor).toInt().coerceIn(0, bitmap.height - 1); val bottom = (region.bottom * factor).toInt().coerceIn(top + 1, bitmap.height)
                 for (px in left until right) for (py in top until bottom) {
                     val color = bitmap.getPixel(px, py)
-                    if (Color.alpha(color) < 128) continue
+                    if (Color.alpha(color) < 128) { continue }
                     total += (0.2126f * Color.red(color) + 0.7152f * Color.green(color) + 0.0722f * Color.blue(color)) / 255f; samples++
                 }
                 if (samples == 0) null else total / samples
@@ -213,13 +218,13 @@ class DocumentWebView(context: Context, val document: Document, private val repo
         val file = PathGuard.resolve(contentRoot, Uri.decode(path))
         require(file.isFile)
         val mime = when (file.extension.lowercase()) {
-            "html", "htm" -> "text/html"; "js", "mjs" -> "application/javascript"; "css" -> "text/css"
+            "html", "htm" -> "text/html"; "xhtml" -> "application/xhtml+xml"; "js", "mjs" -> "application/javascript"; "css" -> "text/css"
             "svg" -> "image/svg+xml"; "json", "map" -> "application/json"; "wasm" -> "application/wasm"
             else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
         }
-        val resources = if (document.networkAllowed) "$origin https: data: blob:" else "$origin data: blob:"
-        val connect = if (document.networkAllowed) "https: wss:" else origin
-        val csp = "sandbox allow-scripts; default-src $resources; script-src $resources 'unsafe-inline' 'unsafe-eval'; style-src $resources 'unsafe-inline'; connect-src $connect; worker-src 'none'; frame-src $origin; object-src 'none'; base-uri $origin; form-action 'none'"
+        val resources = if (networkAllowed) "$origin https: data: blob:" else "$origin data: blob:"
+        val connect = if (networkAllowed) "https: wss:" else origin
+        val csp = if (document.type == "WEB_SNAPSHOT") "sandbox allow-scripts; default-src $origin data: blob:; script-src 'none'; style-src $origin 'unsafe-inline'; connect-src 'none'; worker-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" else "sandbox allow-scripts; default-src $resources; script-src $resources 'unsafe-inline' 'unsafe-eval'; style-src $resources 'unsafe-inline'; connect-src $connect; worker-src 'none'; frame-src $origin; object-src 'none'; base-uri $origin; form-action 'none'"
         WebResourceResponse(mime, "UTF-8", 200, "OK", mapOf("Access-Control-Allow-Origin" to "*", "Content-Security-Policy" to csp, "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), file.inputStream())
     }.getOrElse { denied() }
     companion object {

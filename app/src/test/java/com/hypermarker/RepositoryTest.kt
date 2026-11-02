@@ -52,6 +52,27 @@ class RepositoryTest {
         assertFalse(orphan.exists())
         assertEquals("Fuente", repo.readMarkdown(doc.id))
     }
+    @Test fun webSnapshotsPublishAtomicallyAndDuplicateIndependently() = runBlocking {
+        val archive = java.io.File(repo.context.cacheDir, "snapshot-repository-test.mhtml")
+        try {
+            val before = repo.dao.documents().size
+            archive.writeText("Truncado")
+            try { repo.saveWebSnapshot(archive, "https://example.test/lesson", "Fallida", null); fail("Publicó archivo inválido") }
+            catch (_: IllegalArgumentException) {}
+            assertEquals(before, repo.dao.documents().size)
+            archive.writeText("MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary=test\r\n\r\n--test\r\nContent-Type: text/html; charset=utf-8\r\nContent-Location: https://example.test/lesson\r\n\r\n<h1>Lección</h1>\r\n--test--\r\n")
+            val doc = repo.saveWebSnapshot(archive, "https://example.test/lesson", "Lección", null)
+            assertEquals("WEB_SNAPSHOT", doc.type); assertFalse(doc.networkAllowed)
+            assertEquals("https://example.test/lesson", repo.webSource(doc.id))
+            assertArrayEquals(archive.readBytes(), repo.directory(doc.id).resolve("capture/page.mhtml").readBytes())
+            repo.duplicate(doc.id, false)
+            val copy = repo.dao.documents().first { it.id != doc.id }
+            repo.delete(doc.id, false)
+            assertTrue(repo.original(copy.id).resolve("index.html").readText().contains("Lección"))
+            assertEquals("https://example.test/lesson", repo.webSource(copy.id)); assertFalse(copy.networkAllowed)
+            try { repo.setNetwork(copy.id, true); fail("Habilitó red en snapshot") } catch (_: IllegalArgumentException) {}
+        } finally { archive.delete() }
+    }
     @Test fun firstImportCreatesParentAndDiskDatabaseSurvivesReopen() = runBlocking {
         database.close()
         val context = ApplicationProvider.getApplicationContext<Context>()

@@ -134,3 +134,16 @@ No probar el PAT real mediante fixtures, comandos de terminal, screenshots ni te
 En `progress.md` o un reporte enlazado registrar: fecha, commit fuente, hito/casos, comando o pasos, resultado (PASS/FAIL/NO EJECUTADO), dispositivo/API Android, versión WebView, versiones de toolchain y ruta a evidencia cuando exista. Para PIN-01/02 se recomienda video o secuencia de capturas con pasos reproducibles. Para seguridad, registrar intento y ausencia del efecto prohibido, no sólo que no hubo crash.
 
 V1 se acepta cuando los requisitos obligatorios están implementados y la matriz correspondiente está verificada, con limitaciones concretas de compatibilidad comunicadas. Pruebas pendientes por falta de entorno siguen pendientes; una compilación por sí sola no completa V1.
+
+## Navegador y Abrir con (ampliación 2026-11-02)
+
+| ID | Comprobación | Resultado esperado |
+| --- | --- | --- |
+| WEB-01 | Dominio, URL HTTPS, búsqueda, HTTP/esquemas privilegiados/host interno | Normalización/búsqueda; rechazo sin acceso a archivos ni origen interno. |
+| WEB-02 | Navegar, back/forward/reload, enlace tocado desde HTML, volver a biblioteca | Navegador separado; lector conserva documento y anotaciones. |
+| WEB-03 | Capturar HTML con contenido dinámico ya cargado, CSS e imagen | MHTML intacto, recursos locales, documento publicado offline; lectura con controlador tras destruir el navegador. |
+| WEB-04 | Copia sin conexión, scripts, assets ausentes e intento de habilitar red | Sin solicitudes ni scripts originales; notas/dibujos nativos disponibles. |
+| WEB-05 | MHTML truncado/excesivo, fallos de carpeta/almacenamiento | Rechazo y compensación; sin documentos parciales. |
+| WEB-06 | ACTION_VIEW de HTML/HTM, XHTML, y archivo privado | App resoluble por MIME; copia privada tras borrar fuente; denegar rutas privadas. |
+
+Desde este cambio SEC-03 se prueba con B revocado explícitamente: el default de nuevos HTML es HTTPS permitido. Las capturas y copias mantienen OFFLINE. No confundir la captura de la página cargada con una réplica completa del sitio; vídeos, canvas, frames y recursos no cargados requieren pruebas/manuales y no tienen garantía de preservación.

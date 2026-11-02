@@ -55,7 +55,7 @@ private val MODE_LABELS = mapOf("VIEW" to "Ver", "EDIT" to "Editar", "DRAW" to "
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () -> Unit, onMarkdown: () -> Unit) {
+fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () -> Unit, onMarkdown: () -> Unit, onBrowse: (String?) -> Unit = {}) {
     val context = LocalContext.current
     val model: ReaderViewModel = viewModel(key = "reader-${document.id}", factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = ReaderViewModel(document, repository, CrossLayoutStore(context)) as T
@@ -204,7 +204,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                         val quickPinSelected = event.optString("type") == "target.selected" && !model.wheelsEnabled && model.pinArmed
                         model.event(event, web?.lastTouchX ?: 0f, web?.lastTouchY ?: 0f)
                         if (quickPinSelected && model.editor != null) model.mode = "VIEW"
-                    }, console = model::log,
+                    }, console = model::log, navigate = { url -> rememberPosition(); scope.launch { if (model.flush()) onBrowse(url) } },
                     finished = { view ->
                         model.mode = "VIEW"; model.pinArmed = false; model.playing = false
                         if (!view.bridgeAvailable) model.error = "Actualiza Android System WebView para habilitar JavaScript seguro y anotaciones. El HTML estático sigue disponible."
@@ -283,7 +283,10 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             MenuHeader("Documento", tone)
             MenuRow(Icons.Outlined.Terminal, "Consola (${model.logs.size})", tone) { menu = false; console = true }
             MenuRow(Icons.Outlined.EditNote, "Crear nota Markdown", tone) { menu = false; rememberPosition(); scope.launch { if (model.flush()) onMarkdown() } }
-            MenuRow(Icons.Outlined.Language, "Permitir recursos HTTPS", tone, trailing = { Switch(document.networkAllowed, { ready = false; model.network(it) }, colors = SwitchDefaults.colors(checkedTrackColor = tone.content, checkedThumbColor = if (tone == GlassTone.LIGHT) Color.White else Color.Black, uncheckedThumbColor = tone.muted, uncheckedTrackColor = Color.Transparent, uncheckedBorderColor = tone.muted)) }) { ready = false; model.network(!document.networkAllowed) }
+            if (document.type != "WEB_SNAPSHOT") MenuRow(Icons.Outlined.Language, "Permitir recursos HTTPS", tone, trailing = { Switch(document.networkAllowed, { ready = false; model.network(it) }, colors = SwitchDefaults.colors(checkedTrackColor = tone.content, checkedThumbColor = if (tone == GlassTone.LIGHT) Color.White else Color.Black, uncheckedThumbColor = tone.muted, uncheckedTrackColor = Color.Transparent, uncheckedBorderColor = tone.muted)) }) { ready = false; model.network(!document.networkAllowed) }
+            MenuRow(Icons.Outlined.Language, if (document.type == "WEB_SNAPSHOT") "Abrir página original" else "Navegar por la web", tone) {
+                menu = false; rememberPosition(); scope.launch { if (model.flush()) onBrowse(repository.webSource(document.id)) }
+            }
             MenuRow(Icons.AutoMirrored.Outlined.LibraryBooks, "Volver a la biblioteca", tone) { menu = false; close() }
             Text((if (model.wheelsEnabled) "Toca la página para mostrar u ocultar los controles. Mantén presionado para abrir la cruceta; mantén una opción para reasignarla. "
                 else "Toca Pin y después un elemento de la página para crear una nota. ") + "Los dibujos siguen coordenadas de página y pueden desalinearse si el texto se reacomoda.",

@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 
 private data class Item(val id: String, val folder: Boolean, val title: String)
 
-private fun kindLabel(type: String) = when (type) { "HTML" -> "HTML interactivo"; "FLOW" -> "Flow Dots"; else -> "Markdown" }
-private fun kindIcon(type: String) = when (type) { "HTML" -> Icons.Outlined.Code; "FLOW" -> Icons.Outlined.Hub; else -> Icons.Outlined.Description }
+private fun kindLabel(type: String) = when (type) { "HTML" -> "HTML interactivo"; "WEB_SNAPSHOT" -> "Página web sin conexión"; "FLOW" -> "Flow Dots"; else -> "Markdown" }
+private fun kindIcon(type: String) = when (type) { "HTML" -> Icons.Outlined.Code; "WEB_SNAPSHOT" -> Icons.Outlined.OfflinePin; "FLOW" -> Icons.Outlined.Hub; else -> Icons.Outlined.Description }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -58,6 +58,7 @@ fun LibraryScreen(model: LibraryViewModel) {
     BackHandler(model.folderId != null) { model.folderId = current?.parentId; search = "" }
     Scaffold(topBar = {
         TopAppBar(title = { Text("Hyper-Marker", fontWeight = FontWeight.SemiBold) }, actions = {
+            IconButton(onClick = { model.browse() }, enabled = !model.busy) { Icon(Icons.Outlined.Language, "Navegar por la web") }
             Box {
                 IconButton(onClick = { adding = true }, enabled = !model.busy) { Icon(Icons.Outlined.Add, "Crear o importar") }
                 DropdownMenu(adding, { adding = false }) {
@@ -78,6 +79,9 @@ fun LibraryScreen(model: LibraryViewModel) {
             Text("Ideas que puedes explorar, anotar y conservar.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
             OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = { Text("Buscar notas y carpetas") },
                 leadingIcon = { Icon(Icons.Outlined.Search, null) }, singleLine = true)
+            TextButton(onClick = { runCatching { search.takeIf { it.isNotBlank() }?.let(com.hypermarker.browser.WebAddress::resolve) }.onSuccess { model.browse(it) }.onFailure { model.error = it.message } }, enabled = !model.busy) {
+                Icon(Icons.Outlined.Language, null); Spacer(Modifier.width(8.dp)); Text("Buscar o abrir una página web")
+            }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { model.folderId = null; search = "" }) { Text("Biblioteca") }
                 crumbs.forEach { folder ->

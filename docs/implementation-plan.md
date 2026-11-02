@@ -30,3 +30,7 @@ Sólo después de aceptación V1: overrides de texto, Restore original, conflict
 ## Cambios de alcance
 
 Una dificultad técnica se registra con impacto, evidencia y alternativa propuesta. No reducir V1 unilateralmente. Si una decisión bloquea sólo una parte, continuar las tareas independientes y dejar identificado el criterio pendiente. La ausencia de SDK permite preparar código/documentación, pero no declarar build ni APK verificados.
+
+## Ampliación autorizada del 2026-11-02
+
+Navegador HTTPS, capturas offline, nuevo valor de red y recepción Android «Abrir con»: [decisiones y límites](proposals/web-browser.md). Se implementan por solicitud explícita sin modificar la especificación original ni declarar completadas las pruebas manuales pendientes de V1. Validación en `progress.md`; casos WEB-01–06 en la matriz.

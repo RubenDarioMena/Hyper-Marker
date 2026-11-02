@@ -9,6 +9,7 @@ app/src/main/java/com/hypermarker/
   MainActivity.kt           Entrada, intents compartidos y selección de pantalla
   library/                  Biblioteca Compose, operaciones y licencias
   storage/                  Room, repositorio y SafeImporter
+  browser/                  Navegación HTTPS y captura/conversión MHTML offline
   viewer/                   WebView, ReaderViewModel, cromo de cristal, cruceta y acciones
   markdown/                 Fuente/Visual, barra de formato, política de round-trip y guardado
   flow/                     Flow Dots: canvas, gestos, reglas puras del grafo y cámara
@@ -47,7 +48,7 @@ Los esquemas Room se exportan en `app/schemas/com.hypermarker.storage.LibraryDat
 | Entidad real | Datos | Invariantes |
 | --- | --- | --- |
 | Folder | id, parentId?, name, createdAt | FK de padre con cascada; movimientos sin ciclos ni destinos inexistentes. |
-| Document | id, folderId?, title, type, entryPath?, networkAllowed, revision, createdAt, updatedAt | UUID independiente del nombre; tipo HTML/MARKDOWN; red inicialmente false. |
+| Document | id, folderId?, title, type, entryPath?, networkAllowed, revision, createdAt, updatedAt | UUID independiente del nombre; tipos HTML/MARKDOWN/FLOW/REMOTE_MARKDOWN/WEB_SNAPSHOT; nuevos HTML con HTTPS permitido (decisión de 2026-11-02); snapshots offline. |
 | Annotation | id, documentId, kind, pageKey, payload, schemaVersion | PIN/STROKE/TEXT; FK al documento; payload JSON v1 validado y separado del HTML. TEXT guarda ancla, texto original completo y sustitución. |
 | ViewerPreference | documentId, zoom, scrollY, speed, direction, pagePath? | Preferencia por documento, sin reanudar autoscroll por sorpresa. |
 | FlowNode | id, documentId, title, body, x, y, collapsed, createdAt, updatedAt, deletedAt? | Punto de un documento `FLOW`; coordenadas de mundo en dp; título o cuerpo no vacío; borrado lógico (tombstone) para sincronización futura. |
@@ -79,7 +80,7 @@ Los valores de límites están en `ImportLimits` y [security.md](docs/security.m
 
 Cada documento se sirve desde una URL virtual `https://d<UUID>.hypermarker.invalid`. Un `WebViewAssetLoader` con `PathHandler` sólo abre su raíz `original/`. Rutas locales rechazadas nunca caen a filesystem o red. El editor usa un origen HTTPS propio (`editor.hypermarker.invalid`) y sólo assets del APK.
 
-El lector deshabilita file/content URL access, accesos universales, cookies, popups, geolocalización y permisos web automáticos. La red permanece OFFLINE salvo autorización explícita por documento. Se combinan intercepción nativa, `blockNetworkLoads` y CSP en respuestas locales; un bootstrap offline se instala mediante `DOCUMENT_START_SCRIPT` antes de los scripts importados para restringir canales que no controla CSP por sí sola. Se requiere un proveedor WebView actualizado para JavaScript/anotaciones seguras. Workers y service workers están bloqueados incluso con red permitida.
+El lector deshabilita file/content URL access, accesos universales, cookies, popups, geolocalización y permisos web automáticos. Desde la autorización del 2026-11-02, nuevos HTML permiten HTTPS/WSS por defecto; las preferencias existentes se conservan y las copias web permanecen OFFLINE. Se combinan intercepción nativa, `blockNetworkLoads` y CSP en respuestas locales; un bootstrap offline se instala mediante `DOCUMENT_START_SCRIPT` antes de los scripts importados para restringir canales que no controla CSP por sí sola. Se requiere un proveedor WebView actualizado para JavaScript/anotaciones seguras. Workers y service workers están bloqueados incluso con red permitida.
 
 Permitir red autoriza recursos HTTPS/WSS, no navegación principal externa ni acceso a otras bibliotecas. Revocar recrea WebView con nueva política y destruye el anterior. La CSP aplica `sandbox allow-scripts` sin `allow-same-origin`: cada frame del contenido tiene origen opaco, incluso si la URL es local. Esto impide recuperar constructores de red desde un iframe vacío. Las respuestas locales incluyen CORS para módulos ES/fetch relativos. Cookies e IndexedDB no están disponibles; un shim de `localStorage`/`sessionStorage` mantiene las APIs comunes sólo en memoria por sesión. Esta limitación se aplica también al permitir red, para no convertir ese permiso en una concesión implícita de almacenamiento. No hay pretensión de sandbox perfecto: los límites y pruebas están en [security.md](docs/security.md).
 
@@ -149,7 +150,7 @@ Función adicional aprobada en [docs/proposals/github-sync.md](docs/proposals/gi
 
 Room v3 añade `remote_folders` y `remote_entries` mediante migración v2→v3. La identidad remota incluye repo ID, rama y ruta; cambiar de rama crea otra carpeta. HTML remoto conserva un documento y anclas de página estables mientras `remote-current` apunta a la generación privada publicada; Markdown remoto mantiene ID, fuente versionada y tipo de solo lectura. Desvincular convierte los archivos al formato local conservando IDs y anotaciones. El paquete HTML se valida en staging y sólo después se confirma el nuevo SHA en Room. Ante fallo previo, el snapshot anterior sigue accesible. Si la publicación del puntero de archivos falla tras la transacción de Room, `LibraryRepository.recover` lo reconstruye al iniciar.
 
-El sondeo periódico usa una sola `PeriodicWorkRequest` global, 60 min como mínimo, con red no medida, batería y almacenamiento suficientes. Entrar en carpeta intenta actualizar después de 10 min bajo red no medida y batería suficiente. Abrir un documento no activa red del WebView: su permiso sigue siendo individual y OFFLINE por defecto. La telemetría local registra cuerpos HTTP y estado; sus límites propios son distintos de `X-RateLimit-*` de GitHub. Detalles, evidencias y pendientes están en la propuesta y en [progress.md](progress.md).
+El sondeo periódico usa una sola `PeriodicWorkRequest` global, 60 min como mínimo, con red no medida, batería y almacenamiento suficientes. Entrar en carpeta intenta actualizar después de 10 min bajo red no medida y batería suficiente. Abrir un documento no activa red del WebView: su permiso sigue siendo individual: los HTML nuevos permiten HTTPS por defecto desde el 2026-11-02 y los valores existentes se conservan. La telemetría local registra cuerpos HTTP y estado; sus límites propios son distintos de `X-RateLimit-*` de GitHub. Detalles, evidencias y pendientes están en la propuesta y en [progress.md](progress.md).
 
 ### Cierre técnico de GitHub Sync (2026-10-27)
 
@@ -160,3 +161,9 @@ Cada `DocumentWebView` captura la raíz de su generación al crearse. Publicar o
 El presupuesto guarda reloj civil, tiempo monotónico y contador de arranque: bloquea retrocesos y saltos incompatibles dentro del mismo arranque. Una configuración corrupta falla cerrada y su reparación explícita mantiene pausa y una espera conservadora de 24 h. Las respuestas se acotan al saldo de bytes antes de leer y se cuentan también las lecturas parciales. Un 401 suspende el uso de la credencial hasta una comprobación de reconexión exitosa.
 
 El panel de consumo presenta ventanas 1 h/24 h/30 días por fuente y total, almacenamiento, estados HTTP y ejecuciones recientes con duración, CPU del proceso y condiciones de batería; la CPU es un indicador indirecto. El detalle se limita a 500 peticiones y 500 ejecuciones, con agregados diarios HTTP hasta 30 días. Exportar usa SAF y sustituye las identidades de fuentes por ordinales, sin nombres de repositorio, paths, cuerpos ni credenciales. La selección de repo/rama sigue `Link` con host/ruta comprobados y un cap explícito de cinco páginas; se conserva entrada manual como alternativa.
+
+## Navegador y capturas offline (2026-11-02)
+
+Cambio autorizado en [web-browser.md](docs/proposals/web-browser.md). `BrowserScreen`/`BrowserViewModel` alojan un `BrowserWebView` remoto sin bridge ni proveedor de archivos. La biblioteca mantiene la pantalla activa y la URL inicial; el lector sólo propone navegación HTTPS tras un toque del usuario. `WebAddress` normaliza entradas y bloquea esquemas privilegiados y dominios internos.
+
+La captura usa `saveWebArchive`, convierte el MIME con `WebSnapshot` a recursos con nombres generados, reescribe referencias HTML/CSS y conserva el MHTML intacto separado. `LibraryRepository.saveWebSnapshot` publica un documento `WEB_SNAPSHOT` después de completar los archivos, bajo el mutex y con compensación. El mismo lector y almacén de anotaciones sirven la copia, con red y scripts originales bloqueados incluso si una preferencia inconsistente pidiera red. Sin migración de Room. `ACTION_VIEW` deriva archivos HTML/HTM/XHTML al importador privado, sin reclamar URLs web del sistema.

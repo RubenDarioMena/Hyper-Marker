@@ -50,6 +50,8 @@ class WebViewIntegrationTest {
         File(root, "data.json").writeText("{\"value\":42}")
         File(root, "second.html").writeText("<h1>Segunda página</h1><a href='index.html'>Volver</a>")
         document = runBlocking { repository.finishImport(PendingImport(id, staging, "Integration", listOf("index.html"), "index.html"), "index.html", null) }
+        runBlocking { repository.setNetwork(document.id, false) }
+        document = document.copy(networkAllowed = false)
         attach(document)
     }
     private fun attach(doc: Document) {
