@@ -6,13 +6,9 @@ import org.json.JSONObject
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** Límite local, independiente de las cuotas que informa GitHub. */
+/** Límites de seguridad de archivos; el tráfico HTTP se mide sin cuotas locales. */
 data class ResourceLimits(
-    val requestsPerHour: Int = 60,
-    val requestsPerDay: Int = 500,
-    val requestsPerRun: Int = 30,
     val bytesPerRun: Long = 30L * 1024 * 1024,
-    val bytesPerDay: Long = 150L * 1024 * 1024,
     val fileBytes: Long = 10L * 1024 * 1024,
 )
 
@@ -167,8 +163,6 @@ class ResourceGovernor(
     private val meter = ResourceMeter()
     private var state = store.load()
     private val bootCount = store.bootCount()
-    private var runRequests = 0
-    private var runBytes = 0L
     private var runActive = false
     fun setPaused(value: Boolean) = lock.withLock { state = state.copy(pausedByUser = value); store.save(state) }
     fun updateLimits(value: ResourceLimits) = lock.withLock {
@@ -189,9 +183,9 @@ class ResourceGovernor(
     fun beginRun() = lock.withLock {
         checkedNow()
         if (runActive) throw ResourceBlocked("Ya hay una sincronización en curso")
-        runActive = true; runRequests = 0; runBytes = 0
+        runActive = true
     }
-    fun endRun() = lock.withLock { runActive = false; runRequests = 0; runBytes = 0 }
+    fun endRun() = lock.withLock { runActive = false }
 
     private fun checkedNow(): Long {
         val now = clock()
@@ -207,7 +201,6 @@ class ResourceGovernor(
         store.save(state)
         throw ResourceBlocked(message, until)
     }
-    private fun recent(now: Long, span: Long) = state.events.filter { it.at > now - span }
     private fun foldEvents(events: List<ResourceEvent>, now: Long): List<DailyResourceAggregate> {
         val days = state.daily.associateBy { it.day to it.folderId }.toMutableMap()
         events.forEach { event ->
@@ -226,38 +219,26 @@ class ResourceGovernor(
         if (authenticated && !probe && state.authSuspended) block("Reconecta GitHub: la credencial fue rechazada")
         if (state.pausedByUser) block("La sincronización GitHub está pausada en Ajustes")
         if (now < state.blockedUntil) block("GitHub está en pausa hasta ${state.blockedUntil}", state.blockedUntil)
-        val hour = recent(now, 3_600_000)
-        val day = recent(now, 86_400_000)
-        if (hour.size >= minOf(limits.requestsPerHour, if (authenticated) 60 else 20) || day.size >= minOf(limits.requestsPerDay, if (authenticated) 500 else 100) || (runActive && runRequests >= limits.requestsPerRun))
-            block("Límite local de peticiones alcanzado")
         // status=0 es una reserva; un proceso muerto también consumió presupuesto.
         val combined = state.events + ResourceEvent(now, 0, 0, 0, folderId)
-        val kept = combined.filter { it.at > now - 30L * 86_400_000 }.takeLast(500)
+        val recent = combined.filter { it.at > now - 30L * 86_400_000 }
+        // Conservar al menos 24 h completas aunque haya más de 500 solicitudes.
+        val kept = recent.takeLast(maxOf(500, recent.count { it.at > now - 86_400_000 }))
         val removed = combined.take(combined.size - kept.size)
         state = state.copy(events = kept, daily = foldEvents(removed, now), lastClock = now, lastElapsed = elapsed(), bootCount = bootCount)
         store.save(state)
-        if (runActive) runRequests++
         state.events.lastIndex
     }
 
-    fun remainingBytes(): Long = lock.withLock {
-        val daily = recent(checkedNow(), 86_400_000).sumOf { it.bytesIn }
-        minOf((limits.bytesPerDay - daily).coerceAtLeast(0),
-            if (runActive) (limits.bytesPerRun - runBytes).coerceAtLeast(0) else Long.MAX_VALUE)
-    }
     fun reserveBytes(count: Long) = lock.withLock {
         require(count >= 0)
         val now = checkedNow()
-        val daily = recent(now, 86_400_000).sumOf { it.bytesIn }
-        if (count > limits.bytesPerDay - daily || (runActive && count > limits.bytesPerRun - runBytes))
-            block("Límite local de datos alcanzado")
         // Persistir antes de leer el siguiente bloque. El bloque queda contabilizado si el proceso termina.
         val events = state.events.toMutableList()
         val last = events.lastOrNull() ?: throw IllegalStateException("No hay petición reservada")
         events[events.lastIndex] = last.copy(bytesIn = last.bytesIn + count)
         state = state.copy(events = events, lastClock = now, lastElapsed = elapsed(), bootCount = bootCount)
         store.save(state)
-        if (runActive) runBytes += count
     }
 
     fun recordResponse(status: Int, bytesOut: Long = 0, retryAfter: Long = 0,

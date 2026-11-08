@@ -1,6 +1,5 @@
 package com.hypermarker.github
 
-import android.util.Base64
 import androidx.room.withTransaction
 import com.hypermarker.security.PathGuard
 import com.hypermarker.storage.Document
@@ -116,8 +115,6 @@ class GitHubSyncEngine(
                 library.installRemoteVersion(document, commit)
         } }
         val now = System.currentTimeMillis()
-        if (manual && source.lastAttempt > 0 && now - source.lastAttempt < 60_000)
-            throw ResourceBlocked("Espera 60 segundos entre actualizaciones manuales")
         if (now < source.nextRetryAt) throw ResourceBlocked("La fuente está en pausa hasta ${source.nextRetryAt}", source.nextRetryAt)
         if (!manual && source.lastCheck > 0 && now - source.lastCheck < 10 * 60_000)
             return@withContext "La copia local está al día según el intervalo de apertura"
@@ -155,19 +152,13 @@ class GitHubSyncEngine(
             require(included.all { it.size in 0..governor.limits.fileBytes }) { "Un archivo supera el límite de ${governor.limits.fileBytes / 1024 / 1024} MiB" }
             require(included.sumOf { it.size } <= governor.limits.bytesPerRun) { "La carpeta supera ${governor.limits.bytesPerRun / 1024 / 1024} MiB por sincronización" }
             val old = dao.remoteEntries(id).associateBy { it.path }
-            val previousHtml = source.htmlDocumentId?.let { library.original(it) }
-            val budget = ImportBudget(stage, ImportLimits(files = 10_000, perFile = governor.limits.fileBytes,
-                total = governor.limits.bytesPerRun))
-            for (item in included) {
-                currentCoroutineContext().ensureActive()
-                val dest = budget.destination(item.path)
-                val previous = old[item.path]?.takeIf { it.sha == item.sha && it.state == "ACTIVE" }
-                val cached = if (previous == null) null else if (previous.documentId != null && previous.documentId != source.htmlDocumentId)
-                    dao.document(previous.documentId)?.entryPath?.let { PathGuard.resolve(library.directory(previous.documentId), it) }
-                else previousHtml?.let { PathGuard.resolve(it, item.path) }
-                val bytes = if (cached?.isFile == true) { reusedBytes += item.size; cached.readBytes() } else blob(base, item.sha, item.size, token, id)
-                require(bytes.size.toLong() == item.size && gitBlobSha(bytes) == item.sha) { "El archivo cambió durante la descarga" }
-                budget.copy(bytes.inputStream(), dest)
+            if (included.isNotEmpty()) {
+                val archive = File(stage.parentFile, "$id.zip")
+                try {
+                    archive.writeBytes(api.get("$base/zipball/$commit", token, id,
+                        maxBytes = 60L * 1024 * 1024).body)
+                    extractArchive(archive, stage, source.repoPath, included)
+                } finally { archive.delete() }
             }
             validateLocalAssets(stage, included)
             val stagedBytes = stage.walkTopDown().filter { it.isFile }.sumOf { it.length() }
@@ -310,12 +301,49 @@ class GitHubSyncEngine(
         return result
     }
 
-    private suspend fun blob(base: String, sha: String, size: Long, token: String?, folderId: String): ByteArray {
-        val response = api.get("$base/git/blobs/$sha", token, folderId,
-            maxBytes = minOf(28L * 1024 * 1024, (size * 4 / 3) + 200_000))
-        val json = response.json()
-        require(json.getString("encoding") == "base64" && json.getString("sha") == sha)
-        return Base64.decode(json.getString("content"), Base64.DEFAULT)
+    private suspend fun extractArchive(archive: File, stage: File, folderPath: String, included: List<TreeEntry>) {
+        val expected = included.associateBy { it.path }
+        val found = mutableSetOf<String>()
+        val paths = mutableSetOf<String>()
+        val budget = ImportBudget(stage, ImportLimits(files = 10_000,
+            perFile = governor.limits.fileBytes, total = governor.limits.bytesPerRun))
+        var root: String? = null
+        var count = 0
+        @Suppress("DEPRECATION")
+        org.apache.commons.compress.archivers.zip.ZipFile(archive).use { zip ->
+            val entries = zip.entries
+            while (entries.hasMoreElements()) {
+                currentCoroutineContext().ensureActive()
+                val entry = entries.nextElement()
+                require(++count <= 100_000) { "Demasiadas entradas en el ZIP" }
+                require(!entry.isUnixSymlink && (entry.unixMode and 0xF000 == 0 ||
+                    entry.unixMode and 0xF000 in listOf(0x8000, 0x4000))) { "Entrada ZIP especial no permitida" }
+                val normalized = PathGuard.normalize(entry.name.trimEnd('/'))
+                require(paths.add(java.text.Normalizer.normalize(normalized, java.text.Normalizer.Form.NFC).lowercase(java.util.Locale.ROOT))) { "Colisión de rutas ZIP" }
+                val prefix = normalized.substringBefore('/')
+                if (root == null) root = prefix
+                require(prefix == root) { "El ZIP tiene múltiples raíces" }
+                if (entry.isDirectory) continue
+                require('/' in normalized) { "El ZIP no contiene una raíz de repositorio" }
+                val repoPath = normalized.substringAfter('/')
+                val selected = if (folderPath.isEmpty()) repoPath else {
+                    if (!repoPath.startsWith("$folderPath/")) continue
+                    repoPath.removePrefix("$folderPath/")
+                }
+                val item = expected[selected] ?: continue
+                require(found.add(selected) && zip.canReadEntryData(entry)) { "Archivo ZIP duplicado o no soportado" }
+                val target = budget.destination(selected)
+                var crc = 0L
+                val size = java.util.zip.CheckedInputStream(zip.getInputStream(entry), java.util.zip.CRC32()).use { input ->
+                    val size = budget.copy(input, target); crc = input.checksum.value; size
+                }
+                require(size == item.size && entry.crc == crc &&
+                    size <= maxOf(1L, entry.compressedSize) * 200 && gitBlobSha(target.readBytes()) == item.sha) {
+                    "El ZIP contiene un archivo corrupto o distinto de la revisión elegida"
+                }
+            }
+        }
+        require(found == expected.keys) { "El ZIP no contiene todos los archivos de la carpeta" }
     }
 
     private fun gitBlobSha(bytes: ByteArray): String {

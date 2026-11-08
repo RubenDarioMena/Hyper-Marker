@@ -1,7 +1,6 @@
 package com.hypermarker
 
 import android.content.Context
-import android.util.Base64
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.hypermarker.github.*
@@ -44,6 +43,16 @@ class GitHubSyncTest {
             onBytes(response.body.size)
             return response
         }
+        fun archive(commit: String, files: Map<String, String>, prefix: String = "") {
+            val output = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(output).use { zip ->
+                for ((path, text) in files) {
+                    zip.putNextEntry(java.util.zip.ZipEntry("owner-repo-$commit/$prefix$path"))
+                    zip.write(text.toByteArray()); zip.closeEntry()
+                }
+            }
+            responses["/repos/owner/repo/zipball/$commit"] = GitHubResponse(200, emptyMap(), output.toByteArray())
+        }
         fun json(path: String, value: JSONObject) { responses[path] = GitHubResponse(200, emptyMap(), value.toString().toByteArray()) }
     }
     @Before fun setUp() {
@@ -75,10 +84,9 @@ class GitHubSyncTest {
                 val bytes = text.toByteArray()
                 val sha = sha(bytes)
                 entries.put(JSONObject().put("path", path).put("type", "blob").put("mode", "100644").put("sha", sha).put("size", bytes.size))
-                transport.json("$base/git/blobs/$sha", JSONObject().put("encoding", "base64").put("sha", sha)
-                    .put("content", Base64.encodeToString(bytes, Base64.NO_WRAP)))
             }
             transport.json("$base/git/trees/$tree", JSONObject().put("truncated", false).put("tree", entries))
+            transport.archive(commit, files, "docs/")
         }
         configure(commit1, tree1, initial)
         assertTrue(engine.sync(source.id, manual = true).contains("Actualizado"))
@@ -87,10 +95,11 @@ class GitHubSyncTest {
         assertEquals("# Uno", repo.readMarkdown(markdown.id))
         assertTrue(repo.original(html.id).resolve("style.css").isFile)
         repo.replaceAnnotations(html.id, listOf(Annotation("pin-1", html.id, "PIN", "/index.html", "{}")))
-        val blobCalls = transport.calls.count { "/git/blobs/" in it }
+        assertTrue(transport.calls.none { "/git/blobs/" in it })
+        val blobCalls = transport.calls.count { "/zipball/" in it }
         db.dao().put(db.dao().remoteFolder(source.id)!!.copy(lastAttempt = 0, lastCheck = 0))
         engine.sync(source.id)
-        assertEquals(blobCalls, transport.calls.count { "/git/blobs/" in it })
+        assertEquals(blobCalls, transport.calls.count { "/zipball/" in it })
         configure(commit2, tree2, initial + ("readme.md" to "# Dos"))
         db.dao().put(db.dao().remoteFolder(source.id)!!.copy(lastCheck = 0))
         engine.sync(source.id)
@@ -106,7 +115,7 @@ class GitHubSyncTest {
         assertEquals("# Dos", repo.readMarkdown(markdown.id))
         val commit3 = "7".repeat(40)
         configure(commit3, "8".repeat(40), initial + ("readme.md" to "# Tres"))
-        val failedBlob = "$base/git/blobs/${sha("# Tres".toByteArray())}"
+        val failedBlob = "$base/zipball/$commit3"
         transport.responses[failedBlob] = GitHubResponse(500, emptyMap(), ByteArray(0))
         db.dao().put(db.dao().remoteFolder(source.id)!!.copy(lastCheck = 0, nextRetryAt = 0))
         try { engine.sync(source.id); fail("Se publicó una descarga parcial") } catch (_: GitHubApiException) {}
@@ -126,7 +135,7 @@ class GitHubSyncTest {
     private suspend fun harness(available: () -> Long = { Long.MAX_VALUE }, storage: Long = 500L * 1024 * 1024,
         beforeCommit: suspend () -> Unit = {}): Harness {
         val transport = FakeTransport()
-        val governor = ResourceGovernor(Store(), limits = ResourceLimits(requestsPerHour = 1000, requestsPerDay = 2000))
+        val governor = ResourceGovernor(Store(), limits = ResourceLimits())
         val engine = GitHubSyncEngine(repo, GitHubApiClient(governor, transport), GitHubAuthStore(context), governor,
             availableBytes = available, storageLimit = storage, beforeCommit = beforeCommit)
         return Harness(engine, transport, engine.add(GitHubRepo(123, "owner", "repo", "main", false), "main", "", null))
@@ -140,10 +149,9 @@ class GitHubSyncTest {
         files.forEach { (path, text) ->
             val bytes = text.toByteArray(); val sha = sha(bytes)
             tree.put(JSONObject().put("path", path).put("type", "blob").put("mode", "100644").put("sha", sha).put("size", bytes.size))
-            h.transport.json("$base/git/blobs/$sha", JSONObject().put("encoding", "base64").put("sha", sha)
-                .put("content", Base64.encodeToString(bytes, Base64.NO_WRAP)))
         }
         h.transport.json("$base/git/trees/${"2".repeat(40)}", JSONObject().put("truncated", false).put("tree", entries ?: tree))
+        h.transport.archive(commit, files)
     }
     private suspend fun resetAttempt(h: Harness) { db.dao().put(db.dao().remoteFolder(h.source.id)!!.copy(lastCheck = 0, nextRetryAt = 0)) }
 
@@ -268,6 +276,26 @@ class GitHubSyncTest {
         repo.saveMarkdown(local.id, "Local edit")
         assertEquals("# Updated", repo.readMarkdown(original.id))
     }
+    @Test fun manyFilesUseOneZipAndCorruptOrIncompleteZipNeverPublishes() = runBlocking {
+        val h = harness()
+        val files = (1..40).associate { "note$it.md" to "# Note $it" }
+        configure(h, files = files)
+        h.engine.sync(h.source.id)
+        assertEquals(1, h.transport.calls.count { "/zipball/" in it })
+        assertEquals(4, h.transport.calls.size)
+        assertTrue(h.transport.calls.none { "/git/blobs/" in it })
+        assertEquals(40, db.dao().documents().size)
+        val commit = "3".repeat(40)
+        for (zipFiles in listOf(files - "note1.md", files + ("note1.md" to "tampered"), files + ("../escape.md" to "escape"))) {
+            configure(h, commit, files)
+            h.transport.archive(commit, zipFiles)
+            resetAttempt(h)
+            try { h.engine.sync(h.source.id); fail("Publicó ZIP inválido") } catch (_: IllegalArgumentException) {}
+            assertEquals("1".repeat(40), db.dao().remoteFolder(h.source.id)!!.latestCommitSha)
+            assertEquals(40, db.dao().documents().size)
+        }
+    }
+
     private fun sha(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-1")
         digest.update("blob ${bytes.size}\u0000".toByteArray())

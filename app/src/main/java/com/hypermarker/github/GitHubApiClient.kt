@@ -21,8 +21,11 @@ interface GitHubTransport {
 class HttpsGitHubTransport : GitHubTransport {
     override fun get(path: String, token: String?, etag: String?, maxBytes: Long, onBytes: (Int) -> Unit): GitHubResponse {
         require(path.startsWith('/') && !path.startsWith("//") && '#' !in path && '\\' !in path && ".." !in path)
-        val url = URL("https://api.github.com$path")
-        require(url.host == "api.github.com" && url.protocol == "https")
+        return getAt(URL("https://api.github.com$path"), token, etag, maxBytes, onBytes, path.contains("/zipball/"))
+    }
+
+    private fun getAt(url: URL, token: String?, etag: String?, maxBytes: Long, onBytes: (Int) -> Unit, archive: Boolean): GitHubResponse {
+        require(url.protocol == "https" && url.host in setOf("api.github.com", "codeload.github.com"))
         val connection = url.openConnection() as HttpsURLConnection
         connection.instanceFollowRedirects = false
         connection.connectTimeout = 12_000
@@ -35,6 +38,13 @@ class HttpsGitHubTransport : GitHubTransport {
         try {
             val status = connection.responseCode
             val headers = connection.headerFields.filterKeys { it != null }.mapValues { it.value.joinToString(", ") }
+            if (archive && status in listOf(301, 302, 303, 307, 308)) {
+                val target = archiveRedirect(connection.getHeaderField("Location"))
+                connection.disconnect()
+                // La URL firmada de GitHub autoriza la descarga privada; nunca reenviar el PAT.
+                val downloaded = getAt(target, null, null, maxBytes, onBytes, false)
+                return downloaded.copy(headers = headers.filterKeys { it.startsWith("X-RateLimit-", true) } + downloaded.headers)
+            }
             val declared = connection.contentLengthLong
             if (declared > maxBytes) throw ResourceBlocked("Respuesta demasiado grande")
             val input = if (status in 200..299 || status == 304) connection.inputStream else connection.errorStream
@@ -69,8 +79,7 @@ class GitHubApiClient(
     suspend fun get(path: String, token: String?, folderId: String? = null, etag: String? = null,
         maxBytes: Long = 14L * 1024 * 1024, authProbe: Boolean = false): GitHubResponse = mutex.withLock {
         withContext(Dispatchers.IO) {
-            val allowance = minOf(maxBytes, governor.remainingBytes())
-            if (allowance <= 0L) governor.reserveBytes(1) // Registrar el bloqueo sin abrir una conexión.
+            val allowance = maxBytes
             governor.reserveRequest(folderId, authenticated = !token.isNullOrBlank(), probe = authProbe)
             var status = -1
             try {
@@ -110,3 +119,11 @@ class GitHubApiClient(
 }
 
 class GitHubApiException(val status: Int, message: String) : Exception(message)
+
+/** Sólo el endpoint de ZIP puede redirigir a la infraestructura de archivos de GitHub. */
+internal fun archiveRedirect(location: String?): URL {
+    val target = URL(requireNotNull(location) { "GitHub no entregó la ubicación del ZIP" })
+    require(target.protocol == "https" && target.host == "codeload.github.com" &&
+        target.userInfo == null && target.port in listOf(-1, 443) && target.ref == null) { "Redirección ZIP no permitida" }
+    return target
+}

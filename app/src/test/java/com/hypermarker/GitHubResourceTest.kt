@@ -11,33 +11,24 @@ class GitHubResourceTest {
         override fun load() = value
         override fun save(value: ResourceSnapshot) { this.value = value }
     }
-    @Test fun requestsBytesAndReopenRemainBudgeted() {
-        var now = 1_000_000L
+    @Test fun trafficHasNoLocalQuotaEvenAfterReopen() {
         val store = MemoryStore()
-        val limits = ResourceLimits(requestsPerHour = 2, requestsPerDay = 3, requestsPerRun = 2,
-            bytesPerRun = 5, bytesPerDay = 5)
-        val first = ResourceGovernor(store, { now }, limits, elapsed = { now })
+        val now = 1_000_000L
+        val first = ResourceGovernor(store, { now }, elapsed = { now })
         first.beginRun()
-        first.reserveRequest("folder")
-        first.reserveBytes(3)
-        first.recordResponse(304)
+        repeat(101) {
+            first.reserveRequest("folder")
+            first.reserveBytes(2L * 1024 * 1024)
+            first.recordResponse(200)
+        }
         first.endRun()
-        val reopened = ResourceGovernor(store, { now }, limits, elapsed = { now })
+        val reopened = ResourceGovernor(store, { now }, elapsed = { now })
         reopened.beginRun()
-        reopened.reserveRequest("folder")
-        reopened.reserveBytes(2)
-        reopened.recordResponse(200)
-        assertEquals(2, reopened.snapshot().requestsHour)
-        assertEquals(5, reopened.snapshot().bytesDay)
-        try { reopened.reserveRequest("folder"); fail("Se ignoró el límite por hora") } catch (_: ResourceBlocked) {}
-        try { reopened.reserveBytes(1); fail("Se ignoró el límite diario de bytes") } catch (_: ResourceBlocked) {}
-        assertEquals(2, reopened.snapshot().blockedOperations)
+        repeat(500) { reopened.reserveRequest("folder"); reopened.recordResponse(200) }
+        assertEquals(601, reopened.snapshot().totals(now, 30L * 86_400_000).requests)
+        assertEquals(202L * 1024 * 1024, reopened.snapshot().bytesDay)
+        assertEquals(0, reopened.snapshot().blockedOperations)
         reopened.endRun()
-        now += 3_600_001
-        val later = ResourceGovernor(store, { now }, limits, elapsed = { now })
-        later.reserveRequest("folder")
-        assertEquals(3, later.snapshot().requestsDay)
-        try { later.reserveRequest("folder"); fail("Se ignoró el límite diario") } catch (_: ResourceBlocked) {}
     }
 
     @Test fun retryAfterAndClockRollbackFailClosed() = runBlocking {
@@ -73,23 +64,29 @@ class GitHubResourceTest {
         reopened.reserveRequest()
         assertEquals(2, reopened.snapshot().requestsHour)
     }
-    @Test fun partialFailedStreamCountsAndRemainingBudgetBoundsNextResponse() = runBlocking {
-        val governor = ResourceGovernor(MemoryStore(), limits = ResourceLimits(bytesPerDay = 5, bytesPerRun = 5), elapsed = { 1_000L })
+    @Test fun partialFailedStreamIsMeasuredWithoutExhaustingTrafficQuota() = runBlocking {
+        val governor = ResourceGovernor(MemoryStore(), limits = ResourceLimits(bytesPerRun = 5), elapsed = { 1_000L })
         var calls = 0
         val api = GitHubApiClient(governor, object : GitHubTransport {
             override fun get(path: String, token: String?, etag: String?, maxBytes: Long, onBytes: (Int) -> Unit): GitHubResponse {
                 calls++
                 if (calls == 1) { onBytes(2); throw java.io.IOException("synthetic stream failure") }
-                assertEquals(3, maxBytes); onBytes(3)
+                assertEquals(7L, maxBytes); onBytes(3)
                 return GitHubResponse(200, emptyMap(), ByteArray(3))
             }
         })
-        try { api.get("/test", null); fail() } catch (_: java.io.IOException) {}
+        try { api.get("/test", null, maxBytes = 7); fail() } catch (_: java.io.IOException) {}
         assertEquals(2, governor.snapshot().bytesDay)
-        api.get("/test", null)
-        try { api.get("/test", null); fail("Abrió red sin presupuesto de bytes") } catch (_: ResourceBlocked) {}
-        assertEquals(2, calls); assertEquals(5, governor.snapshot().bytesDay)
-        assertEquals(2, governor.snapshot().requestsDay)
+        api.get("/test", null, maxBytes = 7)
+        api.get("/test", null, maxBytes = 7)
+        assertEquals(3, calls); assertEquals(8, governor.snapshot().bytesDay)
+        assertEquals(3, governor.snapshot().requestsDay)
     }
 
+    @Test fun archiveRedirectAllowsOnlyGithubArchiveHost() {
+        assertEquals("codeload.github.com", archiveRedirect("https://codeload.github.com/owner/repo/zip/abc?token=synthetic").host)
+        for (url in listOf("http://codeload.github.com/repo", "https://evil.example/repo", "https://codeload.github.com.evil.example/repo", "https://user@codeload.github.com/repo", "https://codeload.github.com:444/repo")) {
+            try { archiveRedirect(url); fail("Aceptó redirección insegura") } catch (_: IllegalArgumentException) {}
+        }
+    }
 }

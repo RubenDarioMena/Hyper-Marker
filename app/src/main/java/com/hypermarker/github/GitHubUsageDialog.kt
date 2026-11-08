@@ -43,12 +43,10 @@ fun GitHubUsageDialog(model: LibraryViewModel, close: () -> Unit) {
                 Text("Estados: ${totals.statuses.toSortedMap().entries.joinToString { "${if (it.key == -1) "red" else if (it.key == 0) "interrumpida" else it.key.toString()}: ${it.value}" }.ifBlank { "sin peticiones" }}", style = MaterialTheme.typography.bodySmall)
             }
             HorizontalDivider()
-            Text("Sin token: máximo 20 peticiones/h y 100 por 24 h.")
-            Text("Presupuesto global: ${snapshot.requestsHour}/${limits.requestsPerHour} peticiones/h; ${snapshot.requestsDay}/${limits.requestsPerDay} por 24 h; ${bytes(snapshot.bytesDay)}/${bytes(limits.bytesPerDay)}.")
+            Text("Sin cuotas locales de peticiones ni datos transferidos. Se respetan las pausas de GitHub.")
             val usedDisk = if (selected == null) disk.values.sum() else disk[selected] ?: 0
             Text("Copia offline: ${bytes(usedDisk)}. Total: ${bytes(disk.values.sum())}/500 MiB.")
-            if (snapshot.requestsHour >= limits.requestsPerHour * .8 || snapshot.requestsDay >= limits.requestsPerDay * .8 ||
-                snapshot.bytesDay >= limits.bytesPerDay * .8 || disk.values.sum() >= 400L * 1024 * 1024)
+            if (disk.values.sum() >= 400L * 1024 * 1024)
                 Text("Aviso: al menos un límite está al 80 % o más.", color = MaterialTheme.colorScheme.error)
             Text("Operaciones bloqueadas: ${snapshot.blockedOperations} (total local).")
             if (snapshot.lastClock == Long.MAX_VALUE) {
@@ -60,10 +58,10 @@ fun GitHubUsageDialog(model: LibraryViewModel, close: () -> Unit) {
             }
             if (snapshot.authSuspended) Text("Credencial rechazada: reemplaza el token desde Añadir carpeta de GitHub.")
             snapshot.events.lastOrNull { it.githubRemaining != null }?.let {
-                Text("GitHub reportó ${it.githubRemaining}/${it.githubLimit ?: "?"} restantes; restablecimiento: ${date((it.githubReset ?: 0) * 1000)}. Cuota separada del presupuesto local.")
+                Text("GitHub reportó ${it.githubRemaining}/${it.githubLimit ?: "?"} restantes; restablecimiento: ${date((it.githubReset ?: 0) * 1000)}. Cuota del proveedor GitHub.")
             }
             val runs = snapshot.runs.filter { selected == null || it.folderId == selected }
-            Text("Hasta 500 ejecuciones recientes: ${runs.size}; caché evitó aproximadamente ${bytes(runs.sumOf { it.reusedBytes })} de blobs.")
+            Text("Hasta 500 ejecuciones recientes: ${runs.size}; caché evitó aproximadamente ${bytes(runs.sumOf { it.reusedBytes })} de descargas.")
             runs.takeLast(8).reversed().forEach { run ->
                 Text("${date(run.at)} · ${run.outcome} · ${run.durationMs} ms · CPU del proceso ${run.cpuMs} ms · ${run.files} archivos · ${if (run.background) "periódica" else "primer plano"} · batería ${run.batteryPercent?.let { "$it %" } ?: "N/A"} · carga ${run.charging?.let { if (it) "sí" else "no" } ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
             }
@@ -71,7 +69,7 @@ fun GitHubUsageDialog(model: LibraryViewModel, close: () -> Unit) {
             Text("Bytes: cuerpos HTTP; los GET envían 0 B de cuerpo. Cabeceras/TLS y consumo facturado no están incluidos. CPU del proceso es una medida indirecta, no energía. GPU, vatios, mAh, tokens y costo de agentes: N/A.", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { model.setGitHubPaused(!snapshot.pausedByUser); revision++ }) { Text(if (snapshot.pausedByUser) "Reanudar sincronización" else "Pausar toda la sincronización") }
             TextButton(onClick = { model.setGitHubLimits(if (limits.fileBytes == 10L * 1024 * 1024) 20 else 10, (limits.bytesPerRun / 1024 / 1024).toInt()); revision++ }) { Text("Archivo: ${limits.fileBytes / 1024 / 1024} MiB (cambiar 10/20)") }
-            TextButton(onClick = { model.setGitHubLimits((limits.fileBytes / 1024 / 1024).toInt(), if (limits.bytesPerRun == 30L * 1024 * 1024) 60 else 30); revision++ }) { Text("Por sincronización: ${limits.bytesPerRun / 1024 / 1024} MiB (cambiar 30/60)") }
+            TextButton(onClick = { model.setGitHubLimits((limits.fileBytes / 1024 / 1024).toInt(), if (limits.bytesPerRun == 30L * 1024 * 1024) 60 else 30); revision++ }) { Text("Contenido extraído: ${limits.bytesPerRun / 1024 / 1024} MiB (cambiar 30/60)") }
             TextButton(onClick = { revision++ }) { Text("Actualizar contadores") }
             TextButton(onClick = { export.launch("hypermarker-consumo.txt") }) { Text("Exportar agregados sin nombres ni rutas") }
             TextButton(onClick = { model.disconnectGitHub(); close() }) { Text("Desconectar cuenta (conservar copias)") }

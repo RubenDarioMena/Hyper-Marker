@@ -16,7 +16,7 @@ Aplicación Android nativa para organizar proyectos HTML interactivos y notas Ma
 - Pluma, resaltador, borrador, colores, anchos, undo/redo y limpieza confirmada; datos separados del HTML.
 - Navegador integrado con búsqueda o URL HTTPS, historial, recarga y «Descargar página» para estudiar una copia sin conexión con pines y dibujos.
 - Recursos HTTPS/WSS activados en HTML nuevos; se respetan las preferencias existentes. Las páginas descargadas permanecen siempre sin conexión.
-- GitHub Sync en `codex/github-sync`: selección de carpeta GitHub pública o autorizada por PAT, copia offline de Markdown/HTML compilado, refresco manual y periódico optativo, límites de consumo y credencial cifrada. La aceptación física con PAT del propietario sigue pendiente; ver [propuesta y evidencias](docs/proposals/github-sync.md).
+- GitHub Sync en `codex/github-sync`: selección de carpeta GitHub pública o autorizada por PAT, copia offline de Markdown/HTML compilado, refresco manual y periódico optativo, consumo medido sin cuotas locales y credencial cifrada. La aceptación física con PAT del propietario sigue pendiente; ver [propuesta y evidencias](docs/proposals/github-sync.md).
 
 ## Compilar
 

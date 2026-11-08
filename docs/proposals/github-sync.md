@@ -2,6 +2,10 @@
 
 Fuente de alcance: [especificación de sincronización](../../Hyper-Marker_GitHub_Sync_Spec_v1.md), autorizada por el propietario como función adicional a V1. La [especificación original](../../Interactive_Notes_Android_Agent_Design.md) no se modifica. La guía de acciones del propietario está en [guia-github-sync.html](../guia-github-sync.html).
 
+## Actualización autorizada: 2026-11-08
+
+El propietario solicita eliminar las cuotas locales y descargar repositorios/carpetas mediante ZIP, conservando el flujo de archivos individuales. Esta decisión reemplaza las filas históricas de red, snapshot y recursos que aparecen más abajo: se descarga un ZIP por revisión nueva, sin blobs individuales; se eliminan cuotas de peticiones y datos transferidos. Se conservan validación SHA/CRC/rutas, topes de extracción y disco, pausas remotas y recuperación. La única redirección admitida es HTTPS a `codeload.github.com` y nunca recibe el PAT. Ver [arquitectura actual](../../architecture.md).
+
 ## Decisiones implementadas en esta rama
 
 | Tema | Decisión | Evidencia y límite |
