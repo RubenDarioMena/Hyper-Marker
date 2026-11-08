@@ -108,11 +108,34 @@ test('canvas produces a surface anchor and accessible target selection works',as
  const targets=await p.evaluate(()=>HyperMarker.accessibleTargets());assert.ok(targets.some(t=>t.selector==='#a'));
  await p.evaluate(()=>HyperMarker.command('selectTarget',{selector:'#a'}));assert.equal((await last(p,'target.selected')).payload.anchor.selector,'#a');await p.close();
 });
-test('drawing completes one transaction, finger taps and long presses do not draw, View stays interactive',async()=>{
- const p=await page();await mode(p,'DRAW');await p.mouse.move(50,50);await p.mouse.down();await p.mouse.move(180,100,{steps:8});await p.mouse.up();
- const event=await p.evaluate(()=>events.find(e=>e.type==='stroke.completed'));assert.equal(event.payload.coordinates,'PAGE_CSS');assert.ok(event.payload.points.length>2);
- await p.mouse.click(300,300);assert.equal(await count(p,'tap'),1);
- await hold(p,300,320);assert.equal(await count(p,'longpress'),1);
- assert.equal(await count(p,'stroke.completed'),1);
- await mode(p,'VIEW');await p.locator('#button').click();assert.equal(await p.locator('#button').textContent(),'Funciona');await p.close();
+test('drawing requires an element hold, follows its center without scaling and detects a missing anchor',async()=>{
+ const p=await page();await mode(p,'DRAW');
+ await p.mouse.move(50,50);await p.mouse.down();await p.mouse.move(180,100,{steps:8});await p.mouse.up();
+ assert.equal(await count(p,'stroke.completed'),0);
+ await p.mouse.move(50,50);await p.mouse.down();await p.waitForTimeout(150);
+ assert.equal(await p.evaluate(()=>document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('.progress').style.display),'block');
+ await p.waitForTimeout(450);await p.mouse.up();assert.equal(await count(p,'drawing.started'),1);
+ await p.mouse.move(50,50);await p.mouse.down();await p.mouse.move(180,75,{steps:8});await p.mouse.up();
+ const event=await last(p,'stroke.completed');assert.equal(event.payload.coordinates,'ELEMENT_CENTER_CSS');assert.equal(event.payload.anchor.selector,'#a');assert.ok(event.payload.points[0][0]<0);
+ await p.evaluate(data=>HyperMarker.command('annotations',[{id:'stroke',kind:'STROKE',pageKey:data.pageKey,payload:data}]),event.payload);await mode(p,'VIEW');await p.waitForTimeout(50);
+ const before=await p.evaluate(()=>document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('path').getAttribute('d'));
+ await p.locator('#a').evaluate(el=>{el.style.marginLeft='80px';el.style.width='200px';el.style.height='150px';});await p.waitForTimeout(60);
+ const after=await p.evaluate(()=>document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('path').getAttribute('d'));
+ const nums=d=>d.match(/-?[0-9.]+/g).map(Number),b=nums(before),a=nums(after);
+ assert.notEqual(before,after);assert.ok(Math.abs((a[2]-a[0])-(b[2]-b[0]))<.01);
+ await p.setViewportSize({width:420,height:700});await p.evaluate(()=>scrollTo(0,60));await p.waitForTimeout(60);
+ assert.equal(await p.evaluate(()=>document.querySelector('#__hypermarker_overlay').shadowRoot.querySelectorAll('path').length),1);
+ await p.locator('#a').evaluate(el=>el.remove());await p.waitForTimeout(80);assert.deepEqual((await last(p,'anchor.unresolved')).payload.ids,['stroke']);
+ await p.close();
+});
+test('without wheels native text selection and context menu are not prevented',async()=>{
+ const p=await page();await p.evaluate(()=>HyperMarker.command('mode',{mode:'VIEW',wheelsEnabled:false}));
+ const result=await p.locator('#a').evaluate(el=>['selectstart','contextmenu'].map(type=>el.dispatchEvent(new Event(type,{bubbles:true,cancelable:true}))));
+ assert.deepEqual(result,[true,true]);await p.close();
+});
+test('leaving Draw discards the selected element and old page strokes remain readable',async()=>{
+ const p=await page();await mode(p,'DRAW');await hold(p,50,50);assert.equal(await count(p,'drawing.started'),1);
+ await mode(p,'VIEW');await mode(p,'DRAW');await p.mouse.click(50,50);assert.equal(await count(p,'stroke.completed'),0);
+ await p.evaluate(()=>HyperMarker.command('annotations',[{id:'legacy',kind:'STROKE',pageKey:location.pathname+location.search,payload:{points:[[10,20],[30,40]],color:'#123456',width:3,tool:'pen',coordinates:'PAGE_CSS'}}]));
+ await p.waitForTimeout(50);assert.equal(await p.evaluate(()=>document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('path').getAttribute('d')),'M10 20 L30 40');await p.close();
 });

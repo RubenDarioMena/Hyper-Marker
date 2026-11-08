@@ -92,9 +92,9 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
         val uri = Uri.parse(view.url)
         model.savePosition(view.scrollY, zoom, uri.encodedPath + (uri.encodedQuery?.let { "?$it" } ?: "") + (uri.encodedFragment?.let { "#$it" } ?: ""))
     } }
-    fun close() { rememberPosition(); scope.launch { if (model.flush()) onClose() } }
+    fun close() { model.finishDrawing(false); rememberPosition(); scope.launch { if (model.flush()) onClose() } }
     fun dismissCross() { model.cross = null; web?.command("cancel") }
-    fun changeMode(value: String) { model.mode = value; model.pinArmed = false; model.reanchoringId = null; model.pendingAction = null; drawPanel = null; menu = false; model.cross = null; chrome = true }
+    fun changeMode(value: String) { model.finishDrawing(false); model.mode = value; model.pinArmed = false; model.reanchoringId = null; model.pendingAction = null; drawPanel = null; menu = false; model.cross = null; chrome = true }
     fun pickTarget(action: ReaderAction?) {
         model.pendingAction = action ?: if (!model.wheelsEnabled) ReaderAction.PIN else null
         centerCross = action == null && model.wheelsEnabled; model.mode = "EDIT"; menu = false
@@ -104,7 +104,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
         }
     }
     fun perform(action: ReaderAction, request: CrossRequest?) {
-        model.cross = null; web?.command("cancel")
+        model.cross = null; if (!model.drawingActive) web?.command("cancel")
         if (!action.available) { hint = "${action.label}: próximamente."; return }
         if (action.target && request == null) {
             if (action == ReaderAction.ZOOM_FIT) hint = "Mantén presionado un elemento para acercarlo." else pickTarget(action)
@@ -188,6 +188,9 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
     }
     LaunchedEffect(hint) { if (hint != null) { delay(2600); hint = null } }
     Box(Modifier.fillMaxSize()) {
+        if (model.mode == "DRAW" && !model.drawingActive) {
+            LaunchedEffect(model.mode) { hint = "Mantén presionado el elemento sobre el que quieres escribir." }
+        }
         if (model.loaded) key(document.id, document.networkAllowed, generation) {
             AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                 ready = false
@@ -195,7 +198,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                     event = { event ->
                         when (event.optString("type")) {
                             "controller.ready" -> {
-                                ready = true; web?.command("annotations", model.jsonAnnotations())
+                                model.finishDrawing(false); ready = true; web?.command("annotations", model.jsonAnnotations())
                                 pendingInspect?.let { id -> web?.command("inspect", JSONObject().put("id", id)); pendingInspect = null }
                             }
                             "tap" -> if (model.cross == null) { chrome = !chrome; menu = false; drawPanel = null }
@@ -206,7 +209,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                         if (quickPinSelected && model.editor != null) model.mode = "VIEW"
                     }, console = model::log, navigate = { url -> rememberPosition(); scope.launch { if (model.flush()) onBrowse(url) } },
                     finished = { view ->
-                        model.mode = "VIEW"; model.pinArmed = false; model.playing = false
+                        model.finishDrawing(false); model.mode = "VIEW"; model.pinArmed = false; model.playing = false
                         if (!view.bridgeAvailable) model.error = "Actualiza Android System WebView para habilitar JavaScript seguro y anotaciones. El HTML estático sigue disponible."
                     }, crashed = { ready = false; model.error = "El visor se cerró. Tus originales y anotaciones guardadas siguen disponibles; vuelve a cargar el documento." }
                 ).also { view ->
@@ -225,9 +228,12 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             })
         }
         val insets = Modifier.windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
-        AnimatedVisibility(chrome && model.cross == null, Modifier.align(Alignment.TopEnd), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility((chrome || model.drawingActive) && model.cross == null, Modifier.align(Alignment.TopEnd), enter = fadeIn(), exit = fadeOut()) {
             Row(insets.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (model.mode != "VIEW") {
+                if (model.drawingActive) {
+                    IconButton(onClick = { model.finishDrawing(true); changeMode("VIEW") }) { Icon(Icons.Outlined.Check, "Confirmar dibujos", tint = Color(0xFF00C853)) }
+                    IconButton(onClick = { changeMode("VIEW") }) { Icon(Icons.Outlined.Close, "Cancelar dibujos", tint = Color(0xFFFF1744)) }
+                } else if (model.mode != "VIEW") {
                     GlassButton(Icons.AutoMirrored.Outlined.Undo, "Deshacer", tones.first, enabled = model.canUndo, size = 44, onClick = model::undo)
                     GlassButton(Icons.AutoMirrored.Outlined.Redo, "Rehacer", tones.first, enabled = model.canRedo, size = 44, onClick = model::redo)
                 }
@@ -239,7 +245,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             else QuickBar(model.playing, model.pinArmed, model.mode == "DRAW", tones.second, web?.bridgeAvailable == true,
                 onAutoscroll = { val wasPlaying = model.playing; changeMode("VIEW"); model.playing = !wasPlaying; chrome = !model.playing },
                 onPin = { if (model.pinArmed) changeMode("VIEW") else { changeMode("EDIT"); model.pinArmed = true } },
-                onDraw = { changeMode("DRAW"); model.tool = "pen" }, modifier = insets.padding(bottom = 16.dp))
+                onDraw = { changeMode(if (model.mode == "DRAW") "VIEW" else "DRAW"); model.tool = "pen" }, modifier = insets.padding(bottom = 16.dp))
         }
         model.cross?.takeIf { model.wheelsEnabled && it.direct == null }?.let { request ->
             val actions = model.layout.getValue(request.mode)

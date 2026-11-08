@@ -39,6 +39,14 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
     var wheelsEnabled by mutableStateOf(crossStore?.wheelsEnabled() ?: true); private set
     var pinArmed by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
+    var drawingActive by mutableStateOf(false); private set
+    private var drawingBase: List<Annotation>? = null
+    fun finishDrawing(confirm: Boolean) {
+        val base = drawingBase ?: return
+        val result = annotations
+        drawingBase = null; drawingActive = false; annotations = base
+        if (confirm) update(result)
+    }
     var canUndo by mutableStateOf(false); private set
     var canRedo by mutableStateOf(false); private set
     val logs = mutableStateListOf<String>()
@@ -55,6 +63,7 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
         if (values.size > 10_000 || values.sumOf { it.payload.length.toLong() * 2 } > 32L * 1024 * 1024) {
             error = "Las anotaciones de este documento alcanzaron el límite de almacenamiento. Elimina trazos o notas antes de continuar."; return
         }
+        if (drawingBase != null) { annotations = values; return }
         if (history) { undo.addLast(annotations); while (undo.size > 100) undo.removeFirst(); redo.clear() }
         annotations = values
         canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty()
@@ -68,8 +77,8 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
             try { repository.replaceAnnotations(document.id, values); if (annotations == values) saved = true } catch (e: Exception) { error = "No se guardaron las anotaciones: ${e.message}" }
         }
     }
-    fun undo() { if (undo.isNotEmpty()) { val previous = undo.removeLast(); redo.addLast(annotations); update(previous, false) } }
-    fun redo() { if (redo.isNotEmpty()) { val next = redo.removeLast(); undo.addLast(annotations); update(next, false) } }
+    fun undo() { if (drawingActive) return; if (undo.isNotEmpty()) { val previous = undo.removeLast(); redo.addLast(annotations); update(previous, false) } }
+    fun redo() { if (drawingActive) return; if (redo.isNotEmpty()) { val next = redo.removeLast(); undo.addLast(annotations); update(next, false) } }
     fun clearDrawing(page: String) = update(annotations.filterNot { it.kind == "STROKE" && it.pageKey == page })
     fun delete(id: String) = update(annotations.filterNot { it.id == id })
     /** Sólo elimina ids del tipo y página indicados; la lista proviene de la página y no es confiable. */
@@ -128,8 +137,10 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
                 else if (!wheelsEnabled && pinArmed) { pinArmed = false; openPinEditor(payload, page) }
                 else { cross = CrossRequest(mode, payload, page, x, y, pendingAction); pendingAction = null }
             }
-            "stroke.completed" -> if (mode == "DRAW") update(annotations + Annotation(UUID.randomUUID().toString(), document.id, "STROKE", page, payload.toString()))
-            "stroke.erase" -> if (mode == "DRAW") {
+            "drawing.started" -> if (mode == "DRAW" && !drawingActive) { drawingBase = annotations; drawingActive = true }
+            "drawing.cancelled" -> finishDrawing(false)
+            "stroke.completed" -> if (mode == "DRAW" && drawingActive) update(annotations + Annotation(UUID.randomUUID().toString(), document.id, "STROKE", page, payload.toString()))
+            "stroke.erase" -> if (mode == "DRAW" && drawingActive) {
                 val id = payload.optString("id")
                 if (annotations.any { it.id == id && it.kind == "STROKE" && it.pageKey == page }) delete(id)
             }
@@ -138,7 +149,7 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
                 if (ids.length() > 10_000) return
                 val missing = (0 until ids.length()).map { ids.optString(it) }.toSet()
                 update(annotations.map { item ->
-                    if (item.kind == "STROKE" || item.pageKey != page) item
+                    if (item.pageKey != page || !JSONObject(item.payload).has("anchor")) item
                     else {
                         val data = JSONObject(item.payload); val anchor = data.getJSONObject("anchor")
                         val status = if (item.id in missing) "UNANCHORED" else "RESOLVED"

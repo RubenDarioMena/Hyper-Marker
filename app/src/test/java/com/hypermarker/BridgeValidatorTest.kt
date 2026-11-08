@@ -34,6 +34,17 @@ class BridgeValidatorTest {
         assertNull(validator.validate(invalid.toString(), "EDIT"))
         assertNull(validator.validate(message(request = "r5").put("documentId", "other").toString(), "EDIT"))
     }
+    @Test fun centeredStrokesRequireValidAnchorsAndFiniteSignedOffsets() {
+        val validator = BridgeValidator("s", "d", 1)
+        val stroke = message("stroke.completed", request = "c1")
+        val payload = stroke.getJSONObject("payload").put("coordinates", "ELEMENT_CENTER_CSS")
+            .put("points", JSONArray("[[-30,20],[10,-15]]")).put("tool", "pen").put("color", "#123456").put("width", 3)
+        assertNotNull(validator.validate(stroke.toString(), "DRAW"))
+        stroke.put("requestId", "c2"); payload.remove("anchor")
+        assertNull(validator.validate(stroke.toString(), "DRAW"))
+        assertNull(validator.validate(message("drawing.started", request = "c3").toString(), "VIEW"))
+        assertNotNull(validator.validate(message("drawing.started", request = "c4").toString(), "DRAW"))
+    }
     @Test fun longPressAndSelectionPayloadsAreBounded() {
         val validator = BridgeValidator("s", "d", 1)
         val rect = JSONObject().put("x", 0).put("y", 40).put("width", 300).put("height", 80)

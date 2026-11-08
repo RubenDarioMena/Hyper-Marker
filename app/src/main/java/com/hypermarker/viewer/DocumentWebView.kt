@@ -196,6 +196,7 @@ class DocumentWebView(context: Context, val document: Document, private val repo
     }.getOrElse { regions.map { null } }
     fun changeMode(value: String, accessible: Boolean = false, wheelsEnabled: Boolean = true) {
         mode = value
+        setOnLongClickListener { (bridgeAvailable && wheelsEnabled) || mode != "VIEW" }
         command("mode", JSONObject().put("mode", value).put("accessible", accessible).put("wheelsEnabled", wheelsEnabled))
     }
     fun command(type: String, payload: Any = JSONObject()) {

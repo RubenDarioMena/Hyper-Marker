@@ -1,0 +1,9 @@
+# Compartir HTML con notas — propuesta pendiente
+
+Solicitud del propietario: comentar el enfoque antes de implementar el botón denominado provisionalmente «importar con notas», para entregar feedback a agentes. **No implementado.** Como la acción genera un archivo para compartir fuera de Hyper-Marker, se recomienda el rótulo «Exportar con notas».
+
+Se propone un ZIP con el HTML original y sus recursos sin modificar, `annotations.json` versionado, `feedback.md` legible sin ejecutar HTML y una vista de revisión con pines y trazos superpuestos. El Markdown incluye por nota: título/texto, página, selector del elemento, texto contextual, estado del ancla y una referencia al dibujo correspondiente. El JSON conserva IDs, coordenadas, colores, grosor y estrategia del ancla para reconstruir la revisión. Una captura opcional por elemento comunica a agentes visuales lo que se veía al emitir el feedback y ayuda si el DOM cambió.
+
+La vista de revisión puede mostrar los dibujos mediante SVG y las notas como marcadores con una lista accesible. Se mantiene una copia exacta del original dentro del ZIP; la vista de feedback es derivada. No se ejecuta código del documento para generar instrucciones ni se entrega acceso nativo al contenido. Se exportan sólo el documento elegido y sus anotaciones, sin tokens, preferencias, historial del navegador ni otros documentos.
+
+Para un HTML autónomo podría ofrecerse posteriormente un único HTML con SVG y anotaciones JSON incrustadas. No sería el formato inicial recomendado: proyectos con muchos recursos, referencias relativas y anotaciones de varias páginas se transportan mejor en ZIP. Antes de implementarlo queda acordar nombre del botón, si la captura visual se incluye por defecto y si se requiere reimportación editable además de lectura por agentes.

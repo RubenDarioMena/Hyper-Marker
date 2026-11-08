@@ -193,7 +193,10 @@ class WebViewIntegrationTest {
         assertEquals(stored.id, missing.getString(0))
     }
     @Test fun drawingCompletesTransactionAndCanvasUsesSurface() {
-        mode("DRAW"); val start = rect("a"); val down = SystemClock.uptimeMillis()
+        mode("DRAW"); val start = rect("a")
+        val selecting = SystemClock.uptimeMillis()
+        touch(MotionEvent.ACTION_DOWN, start, selecting); SystemClock.sleep(650); touch(MotionEvent.ACTION_UP, start, selecting)
+        val down = SystemClock.uptimeMillis()
         touch(MotionEvent.ACTION_DOWN, start, down)
         repeat(5) { touch(MotionEvent.ACTION_MOVE, start.first + it * 10f to start.second + it * 5f, down) }
         touch(MotionEvent.ACTION_UP, start.first + 60f to start.second + 30f, down); SystemClock.sleep(200)

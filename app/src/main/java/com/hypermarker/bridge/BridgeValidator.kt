@@ -41,14 +41,18 @@ class BridgeValidator(private val session: String, private val documentId: Strin
                 payload.optJSONObject("text")?.let { text -> listOf("text", "original", "raw").forEach { key -> require(text.optString(key).length <= 20_000) } }
                 listOf("pins", "texts").forEach { key -> payload.optJSONArray(key)?.let { ids -> require(ids.length() <= 10_000 && ids.strings().all { it.length <= 100 }) } }
             }
+            "drawing.started" -> { require(mode == "DRAW"); validateAnchor(payload.getJSONObject("anchor")) }
+            "drawing.cancelled" -> require(mode == "DRAW")
             "stroke.completed" -> {
                 require(mode == "DRAW")
+                val centered = payload.optString("coordinates") == "ELEMENT_CENTER_CSS"
+                if (centered) validateAnchor(payload.getJSONObject("anchor"))
                 val points = payload.getJSONArray("points")
                 require(points.length() in 1..20_000)
                 for (i in 0 until points.length()) {
                     val point = points.getJSONArray(i)
                     require(point.length() == 2)
-                    for (j in 0..1) require(point.getDouble(j).isFinite() && point.getDouble(j) in 0.0..10_000_000.0)
+                    for (j in 0..1) require(point.getDouble(j).isFinite() && point.getDouble(j) in (if (centered) -10_000_000.0 else 0.0)..10_000_000.0)
                 }
                 require(payload.getString("color").matches(Regex("#[a-fA-F0-9]{6}")))
                 require(payload.getDouble("width").isFinite() && payload.getDouble("width") in 1.0..50.0)
@@ -59,5 +63,10 @@ class BridgeValidator(private val session: String, private val documentId: Strin
         }
         message
     }.getOrNull()
+    private fun validateAnchor(anchor: JSONObject) {
+        require(anchor.getString("strategy") in listOf("DOM", "SURFACE", "PAGE"))
+        require(anchor.getString("selector").length in 1..4096 && anchor.getString("tag").length in 1..40 && anchor.optString("text").length <= 160)
+        listOf("relativeX", "relativeY").forEach { require(anchor.getDouble(it).isFinite() && anchor.getDouble(it) in 0.0..1.0) }
+    }
     private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 }

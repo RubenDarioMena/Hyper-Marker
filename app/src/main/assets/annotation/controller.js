@@ -2,7 +2,7 @@
   'use strict';
   if (window.HyperMarker) { window.HyperMarker.destroy(); }
   const state = { mode:'VIEW', annotations:[], config:null, target:null, selected:false, pending:null, active:false, held:false,
-    pointer:null, pointerType:'', start:null, startTime:0, suppressClick:false, tool:'pen', color:'#176b5b', width:3, points:[], accessible:false, wheelsEnabled:true };
+    pointer:null, pointerType:'', start:null, startTime:0, suppressClick:false, tool:'pen', color:'#176b5b', width:3, points:[], accessible:false, wheelsEnabled:true, drawTarget:null };
   const host = document.createElement('div');
   host.id = '__hypermarker_overlay';
   host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:layout style;';
@@ -10,11 +10,22 @@
   shadow.innerHTML = `<style>
     :host{all:initial}*{box-sizing:border-box}.highlight{position:fixed;background:rgba(255,185,55,.24);border:3px solid #b95700;outline:1px solid white;pointer-events:none;display:none}
     .pin{position:fixed;width:48px;height:48px;border-radius:50%;background:#176b5b;color:white;border:2px solid white;box-shadow:0 2px 7px #0005;transform:translate(-50%,-50%);pointer-events:auto;font:700 16px system-ui;min-height:48px;padding:0}
+    .progress{position:fixed;width:96px;height:96px;border-radius:50%;display:none;border:4px solid white;box-shadow:0 2px 10px #0008;pointer-events:none;background:#00e676;color:#003b20;font:700 22px system-ui;text-align:center;line-height:88px}
     svg{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  </style><svg xmlns="http://www.w3.org/2000/svg"></svg><div class="highlight"></div><div class="pins"></div>`;
+  </style><svg xmlns="http://www.w3.org/2000/svg"></svg><div class="highlight"></div><div class="pins"></div><div class="progress" role="progressbar" aria-label="Mantén presionado para dibujar"></div>`;
   document.documentElement.append(host);
   const highlight = shadow.querySelector('.highlight');
   const pins = shadow.querySelector('.pins');
+  const progress=shadow.querySelector('.progress');
+  let progressFrame=0;
+  function stopProgress(){cancelAnimationFrame(progressFrame);progress.style.display='none';}
+  function drawProgress(){
+    if(state.mode!=='DRAW'||state.drawTarget||!state.start)return;
+    const amount=Math.min(1,(performance.now()-state.startTime)/delay());
+    Object.assign(progress.style,{display:'block',left:Math.max(0,Math.min(innerWidth-96,state.start[0]-48))+'px',top:Math.max(0,state.start[1]-125)+'px',background:`conic-gradient(#00e676 ${amount*360}deg,#34483e 0deg)`});
+    progress.textContent=Math.ceil((1-amount)*delay()/100)/10+' s';
+    progressFrame=requestAnimationFrame(drawProgress);
+  }
   const svg = shadow.querySelector('svg');
   const css = document.createElement('style');
   css.textContent = 'html[data-hypermarker-mode="EDIT"] *,html[data-hypermarker-mode="DRAW"] *{-webkit-user-select:none!important;user-select:none!important}html[data-hypermarker-mode="DRAW"]{touch-action:none!important}';
@@ -77,12 +88,12 @@
     state.target=target;
     if(!target){highlight.style.display='none';return;}
     const r=target.el.getBoundingClientRect();
-    Object.assign(highlight.style,{display:'block',left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
+    Object.assign(highlight.style,{borderColor:state.mode==='DRAW'?'#00e676':'#b95700',background:state.mode==='DRAW'?'rgba(0,230,118,.08)':'rgba(255,185,55,.24)',display:'block',left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
   }
   function release() {
-    clearTimeout(state.pending);state.pending=null;state.active=false;state.held=false;state.pointer=null;state.start=null;state.points=[];schedule();
+    stopProgress();clearTimeout(state.pending);state.pending=null;state.active=false;state.held=false;state.pointer=null;state.start=null;state.points=[];schedule();
   }
-  function cancel() { release();state.selected=false;state.suppressClick=false;showTarget(null); }
+  function cancel() { release();state.selected=false;state.suppressClick=false;showTarget(state.drawTarget); }
   function selectAt(x,y) { showTarget(state.mode==='VIEW'?viewTarget(x,y):findTarget(x,y)); }
   function resolve(anchor) {
     try {
@@ -143,14 +154,16 @@
     }
     for(const [el,entry] of Array.from(applied))if(!active.has(entry.id))restore(el);
   }
-  const point=e=>[Math.max(0,e.clientX+scrollX),Math.max(0,e.clientY+scrollY)];
+  const point=e=>{const r=state.drawTarget?.el.getBoundingClientRect();return r?[e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2]:[Math.max(0,e.clientX+scrollX),Math.max(0,e.clientY+scrollY)];};
   function path(points) {return points.map((p,i)=>(i?'L':'M')+p[0]+' '+p[1]).join(' ');}
   function makeStroke(data,id) {
     const element=document.createElementNS('http://www.w3.org/2000/svg','path');
-    element.setAttribute('d',path(data.points));element.setAttribute('stroke',data.color);element.setAttribute('stroke-width',String(data.width));
+    let points=data.points;
+    if(data.coordinates==='ELEMENT_CENTER_CSS'){const el=resolve(data.anchor);if(!el)return null;const r=el.getBoundingClientRect();points=points.map(p=>[p[0]+r.left+r.width/2+scrollX,p[1]+r.top+r.height/2+scrollY]);}
+    element.setAttribute('d',path(points));element.setAttribute('stroke',data.color);element.setAttribute('stroke-width',String(data.width));
     element.setAttribute('stroke-linecap','round');element.setAttribute('stroke-linejoin','round');element.setAttribute('fill','none');
     element.setAttribute('opacity',data.tool==='highlighter'?'.3':'1');
-    if(state.mode==='DRAW'&&state.tool==='eraser'&&id){element.style.pointerEvents='stroke';element.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();send('stroke.erase',{id});});}
+    if(state.mode==='DRAW'&&state.drawTarget&&state.tool==='eraser'&&id){element.style.pointerEvents='stroke';element.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();send('stroke.erase',{id});});}
     return element;
   }
   function render() {
@@ -162,7 +175,7 @@
     applyOverrides(current.filter(a=>a.kind==='TEXT'),unresolved);
     for(const annotation of current) {
       if(annotation.kind==='TEXT')continue;
-      if(annotation.kind==='STROKE') {svg.append(makeStroke(annotation.payload,annotation.id));continue;}
+      if(annotation.kind==='STROKE') {const stroke=makeStroke(annotation.payload,annotation.id);if(stroke)svg.append(stroke);else unresolved.push(annotation.id);continue;}
       const data=annotation.payload,el=resolve(data.anchor);
       if(!el){unresolved.push(annotation.id);continue;}
       const r=el.getBoundingClientRect();
@@ -170,9 +183,11 @@
       marker.style.left=(r.left+r.width*data.anchor.relativeX)+'px';marker.style.top=(r.top+r.height*data.anchor.relativeY)+'px';
       marker.addEventListener('pointerdown',e=>e.stopPropagation());marker.addEventListener('click',e=>{e.stopPropagation();send('annotation.activated',{id:annotation.id});});pins.append(marker);
     }
-    if(state.points.length)svg.append(makeStroke({points:state.points,color:state.color,width:state.tool==='highlighter'?state.width*3:state.width,tool:state.tool}));
+    if(state.points.length)svg.append(makeStroke({anchor:state.drawTarget?.anchor,coordinates:'ELEMENT_CENTER_CSS',points:state.points,color:state.color,width:state.tool==='highlighter'?state.width*3:state.width,tool:state.tool}));
     const unresolvedKey=pageKey()+':'+unresolved.join(',');
     if(unresolvedKey!==lastUnresolved){lastUnresolved=unresolvedKey;send('anchor.unresolved',{ids:unresolved});}
+    if(state.drawTarget&&!state.drawTarget.el.isConnected){state.drawTarget=null;cancel();send('drawing.cancelled');}
+    if(state.drawTarget)showTarget(state.drawTarget);
     if((state.active||state.selected)&&state.target&&state.target.el.isConnected)showTarget(state.target);
   }
   function schedule() {if(!renderQueued){renderQueued=true;requestAnimationFrame(render);}}
@@ -187,6 +202,13 @@
   function hold() {
     clearTimeout(state.pending);state.pending=null;
     if(state.pointer===null)return;
+    if(state.mode==='DRAW'&&!state.drawTarget){
+      stopProgress();selectAt(state.start[0],state.start[1]);
+      if(!state.target)return;
+      state.drawTarget=state.target;state.held=true;state.suppressClick=true;
+      highlight.animate([{background:'rgba(0,255,100,.5)'},{background:'rgba(0,230,118,.08)'}],{duration:350});
+      send('drawing.started',{anchor:state.drawTarget.anchor});send('hold');return;
+    }
     if(!state.wheelsEnabled){
       if(state.mode==='DRAW'){state.active=false;state.points=[];schedule();}
       return;
@@ -201,11 +223,12 @@
     if(!e.isPrimary||state.pointer!==null){cancel();return;}
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(state.selected)cancel();
-    stopContent(e);state.pointer=e.pointerId;state.pointerType=e.pointerType;state.start=[e.clientX,e.clientY];state.startTime=e.timeStamp;state.suppressClick=false;
+    stopContent(e);state.pointer=e.pointerId;state.pointerType=e.pointerType;state.start=[e.clientX,e.clientY];state.startTime=performance.now();state.suppressClick=false;
     if(state.mode==='DRAW') {
       e.preventDefault();
-      if(state.tool!=='eraser'){state.active=true;state.points=[point(e)];schedule();}
-      state.pending=setTimeout(hold,delay());return;
+      if(!state.drawTarget){selectAt(e.clientX,e.clientY);state.pending=setTimeout(hold,delay());drawProgress();}
+      else if(state.tool!=='eraser'){state.active=true;state.points=[point(e)];schedule();}
+      return;
     }
     if(state.mode==='EDIT'&&state.accessible){selectAt(e.clientX,e.clientY);state.active=true;return;}
     state.pending=setTimeout(hold,delay());
@@ -216,7 +239,7 @@
     stopContent(e);
     if(state.mode==='DRAW'){
       e.preventDefault();
-      if(far&&state.pending){clearTimeout(state.pending);state.pending=null;}
+      if(far&&state.pending){clearTimeout(state.pending);state.pending=null;stopProgress();}
       if(state.active){if(state.points.length<20000)state.points.push(point(e));schedule();}
       return;
     }
@@ -241,11 +264,9 @@
       if(quick)send('tap');
     }
     if(state.mode==='DRAW'){
-      if(state.held)send('longpress',{x:e.clientX,y:e.clientY});
-      else if(quick&&state.pointerType!=='pen')send('tap');
-      else if(state.active&&state.points.length){
+      if(!state.held&&state.drawTarget&&state.active&&state.points.length){
         if(state.points.length===1)state.points.push(state.points[0].slice());
-        send('stroke.completed',{points:state.points,color:state.color,width:state.tool==='highlighter'?Math.min(50,state.width*3):state.width,tool:state.tool,coordinates:'PAGE_CSS',viewport:{width:innerWidth,height:innerHeight,scale:visualViewport?.scale||1}});
+        send('stroke.completed',{points:state.points,color:state.color,width:state.tool==='highlighter'?Math.min(50,state.width*3):state.width,tool:state.tool,coordinates:'ELEMENT_CENTER_CSS',anchor:state.drawTarget.anchor,viewport:{width:innerWidth,height:innerHeight,scale:visualViewport?.scale||1}});
       }
     }
     cancel();
@@ -254,6 +275,7 @@
   for(const type of ['click','dblclick','contextmenu','selectstart'])listen(window,type,e=>{
     if(e.composedPath().includes(host))return;
     if(state.mode==='VIEW'){
+      if(!state.wheelsEnabled)return;
       // El menú contextual nativo de Chromium también marca una pulsación prolongada.
       if(type==='contextmenu'&&state.pending)hold();
       if(!state.held&&!state.suppressClick)return;
@@ -273,14 +295,14 @@
   window.HyperMarker={
     init(config){state.config=config;send('controller.ready');schedule();},
     command(type,payload){
-      if(type==='mode'){cancel();stopAuto();state.mode=payload.mode;state.accessible=!!payload.accessible;state.wheelsEnabled=payload.wheelsEnabled!==false;document.documentElement.dataset.hypermarkerMode=state.mode;}
+      if(type==='mode'){if(payload.mode!==state.mode){state.drawTarget=null;}cancel();stopAuto();state.mode=payload.mode;state.accessible=!!payload.accessible;state.wheelsEnabled=payload.wheelsEnabled!==false;document.documentElement.dataset.hypermarkerMode=state.mode;}
       if(type==='annotations'){state.annotations=payload;lastUnresolved='';}
       if(type==='tool'){state.tool=payload.tool;state.color=payload.color;state.width=payload.width;}
       if(type==='selectTarget'){
         const el=document.querySelector(payload.selector);if(el){el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();selectAt(r.left+r.width/2,r.top+r.height/2);
         if(state.target){const value=selection(state.target);send('target.selected',{...value,boundary:value.anchor.strategy==='SURFACE'?'Ancla de superficie':'Elemento elegido sin pulsación prolongada'});state.selected=true;}}
       }
-      if(type==='cancel')cancel();
+      if(type==='cancel'){state.drawTarget=null;cancel();}
       if(type==='inspect'){const value=state.annotations.find(a=>a.id===payload.id);const el=value&&value.pageKey===pageKey()&&elementOf(value);if(el){el.scrollIntoView({block:'center'});showTarget({el});setTimeout(()=>{if(!state.selected&&!state.active)showTarget(null);},2000);}}
       if(type==='autoscroll'){stopAuto();autoSpeed=payload.speed||0;if(autoSpeed)autoFrame=requestAnimationFrame(autoscroll);}
       schedule();
