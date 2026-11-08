@@ -139,3 +139,15 @@ test('leaving Draw discards the selected element and old page strokes remain rea
  await p.evaluate(()=>HyperMarker.command('annotations',[{id:'legacy',kind:'STROKE',pageKey:location.pathname+location.search,payload:{points:[[10,20],[30,40]],color:'#123456',width:3,tool:'pen',coordinates:'PAGE_CSS'}}]));
  await p.waitForTimeout(50);assert.equal(await p.evaluate(()=>document.querySelector('#__hypermarker_overlay').shadowRoot.querySelector('path').getAttribute('d')),'M10 20 L30 40');await p.close();
 });
+
+test('export geometry includes whole drawings outside the viewport and falls back when the anchor disappears',async()=>{
+ const p=await page();const selected=await pin(p,'#a');
+ const payload={anchor:selected.payload.anchor,points:[[-100,-70],[500,1700]],coordinates:'ELEMENT_CENTER_CSS',width:8,color:'#00aa00',tool:'pen',drawingId:'drawing-1'};
+ await p.evaluate(({payload,pageKey})=>HyperMarker.command('annotations',[{id:'one',kind:'STROKE',pageKey,payload}]),{payload,pageKey:selected.payload.pageKey});
+ const geometry=await p.evaluate(()=>HyperMarker.exportDrawing(['one']));
+ assert.equal(geometry.context,true);assert.equal(geometry.paths.length,1);
+ assert.ok(geometry.paths[0].points[1][1]>700);assert.equal(geometry.paths[0].points[1][0]-geometry.paths[0].points[0][0],600);
+ await p.locator('#a').evaluate(el=>el.remove());
+ const missing=await p.evaluate(()=>HyperMarker.exportDrawing(['one']));assert.equal(missing.context,false);assert.deepEqual(missing.paths[0].points,payload.points);
+ await p.close();
+});

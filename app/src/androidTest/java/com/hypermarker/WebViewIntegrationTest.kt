@@ -205,6 +205,27 @@ class WebViewIntegrationTest {
         touch(MotionEvent.ACTION_DOWN, surface, next); SystemClock.sleep(650); touch(MotionEvent.ACTION_UP, surface, next); SystemClock.sleep(200)
         assertEquals("SURFACE", events.last { it.optString("type") == "target.selected" }.getJSONObject("payload").getJSONObject("anchor").getString("strategy"))
     }
+    @Test fun feedbackCaptureIncludesWholeDrawingAndLeavesReaderUntouched() {
+        mode("EDIT")
+        evaluate("window.HyperMarker.command('selectTarget',{selector:'#a'});true")
+        val anchor = events.last { it.optString("type") == "target.selected" }.getJSONObject("payload").getJSONObject("anchor")
+        val stroke = Annotation("export-stroke", document.id, "STROKE", "/index.html", JSONObject()
+            .put("anchor", anchor).put("coordinates", "ELEMENT_CENTER_CSS").put("drawingId", "export-session")
+            .put("points", JSONArray("[[-100,-100],[150,1800]]")).put("width", 4).put("color", "#00aa00").put("tool", "pen").toString())
+        val target = File(instrument.targetContext.cacheDir, "feedback-capture-test.png")
+        val before = decoded("location.href+'|'+scrollX+'|'+scrollY")
+        try {
+            val description = runBlocking { com.hypermarker.export.FeedbackCapture(web, document, repository, repository.original(document.id), listOf(stroke))
+                .capture(com.hypermarker.export.FeedbackDrawing(1, "/index.html", listOf(stroke), "test.png"), target) }
+            assertTrue(description.contains("con contexto"))
+            val bitmap = android.graphics.BitmapFactory.decodeFile(target.path)
+            assertTrue(bitmap.height > 1800)
+            assertEquals(0x00aa00, bitmap.getPixel(26, 26) and 0xffffff)
+            assertEquals(0x00aa00, bitmap.getPixel(bitmap.width - 26, bitmap.height - 26) and 0xffffff)
+            bitmap.recycle()
+            assertEquals(before, decoded("location.href+'|'+scrollX+'|'+scrollY"))
+        } finally { target.delete() }
+    }
     @Test fun offlineBlocksFetchWebsocketWorkersAndOtherDocumentReads() {
         ServerSocket(0).use { server ->
             server.soTimeout = 800

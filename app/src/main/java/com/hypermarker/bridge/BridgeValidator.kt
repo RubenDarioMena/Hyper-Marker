@@ -45,6 +45,7 @@ class BridgeValidator(private val session: String, private val documentId: Strin
             "drawing.cancelled" -> require(mode == "DRAW")
             "stroke.completed" -> {
                 require(mode == "DRAW")
+                require(payload.optString("drawingId").length <= 100)
                 val centered = payload.optString("coordinates") == "ELEMENT_CENTER_CSS"
                 if (centered) validateAnchor(payload.getJSONObject("anchor"))
                 val points = payload.getJSONArray("points")

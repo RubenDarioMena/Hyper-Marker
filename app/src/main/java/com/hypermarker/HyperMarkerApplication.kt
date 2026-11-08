@@ -5,6 +5,10 @@ import com.hypermarker.storage.LibraryRepository
 import com.hypermarker.github.*
 
 class HyperMarkerApplication : Application() {
+    override fun onCreate() {
+        android.webkit.WebView.enableSlowWholeDocumentDraw()
+        super.onCreate()
+    }
     val repository by lazy { LibraryRepository(this) }
     val githubAuth by lazy { GitHubAuthStore(this) }
     val githubResourceSettings by lazy { ResourceSettings(this) }

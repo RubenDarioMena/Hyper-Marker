@@ -3,6 +3,10 @@ package com.hypermarker.viewer
 import android.graphics.RectF
 import android.net.Uri
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.hypermarker.export.FeedbackShare
+import com.hypermarker.export.FeedbackExport
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
@@ -80,6 +84,20 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
     var ready by remember { mutableStateOf(false) }
     var pendingInspect by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    var exporting by remember { mutableStateOf(false) }
+    val exportFeedback = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) scope.launch {
+            val view = web ?: return@launch
+            exporting = true; model.playing = false
+            try {
+                check(model.loaded && !model.drawingActive && model.flush()) { "Confirma o cancela el dibujo y guarda las notas antes de exportar" }
+                FeedbackShare.write(repository, document, model.annotations.toList(), view, uri)
+                hint = "ZIP exportado con notas y capturas completas."
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { model.error = "No se pudo exportar: ${e.message}" }
+            finally { exporting = false }
+        }
+    }
     val activity = checkNotNull(LocalActivity.current)
     val density = LocalDensity.current.density
     fun pageKey(): String {
@@ -187,6 +205,8 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
         crossTone = GlassTone.of(view?.luminance(listOf(RectF(request.x - reach, request.y - reach, request.x + reach, request.y + reach)))?.firstOrNull())
     }
     LaunchedEffect(hint) { if (hint != null) { delay(2600); hint = null } }
+    if (exporting) AlertDialog(onDismissRequest = {}, title = { Text("Exportando con notas") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { CircularProgressIndicator(); Text("Preparando el contenido y las capturas completas de los dibujos…") } }, confirmButton = {})
     Box(Modifier.fillMaxSize()) {
         if (model.mode == "DRAW" && !model.drawingActive) {
             LaunchedEffect(model.mode) { hint = "Mantén presionado el elemento sobre el que quieres escribir." }
@@ -287,6 +307,11 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                 MenuRow(Icons.Outlined.SwapVert, if (model.direction == 1) "Dirección: hacia abajo" else "Dirección: hacia arriba", tone) { model.direction *= -1 }
             }
             MenuHeader("Documento", tone)
+            MenuRow(Icons.Outlined.FileUpload, "Exportar con notas", tone,
+                supporting = if (model.drawingActive) "Confirma o cancela el dibujo primero" else "HTML, notas y una captura completa por dibujo",
+                enabled = model.loaded && !model.drawingActive && !exporting) {
+                menu = false; exportFeedback.launch(FeedbackExport.safeName(document.title) + "-feedback.zip")
+            }
             MenuRow(Icons.Outlined.Terminal, "Consola (${model.logs.size})", tone) { menu = false; console = true }
             MenuRow(Icons.Outlined.EditNote, "Crear nota Markdown", tone) { menu = false; rememberPosition(); scope.launch { if (model.flush()) onMarkdown() } }
             if (document.type != "WEB_SNAPSHOT") MenuRow(Icons.Outlined.Language, "Permitir recursos HTTPS", tone, trailing = { Switch(document.networkAllowed, { ready = false; model.network(it) }, colors = SwitchDefaults.colors(checkedTrackColor = tone.content, checkedThumbColor = if (tone == GlassTone.LIGHT) Color.White else Color.Black, uncheckedThumbColor = tone.muted, uncheckedTrackColor = Color.Transparent, uncheckedBorderColor = tone.muted)) }) { ready = false; model.network(!document.networkAllowed) }
@@ -295,7 +320,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             }
             MenuRow(Icons.AutoMirrored.Outlined.LibraryBooks, "Volver a la biblioteca", tone) { menu = false; close() }
             Text((if (model.wheelsEnabled) "Toca la página para mostrar u ocultar los controles. Mantén presionado para abrir la cruceta; mantén una opción para reasignarla. "
-                else "Toca Pin y después un elemento de la página para crear una nota. ") + "Los dibujos siguen coordenadas de página y pueden desalinearse si el texto se reacomoda.",
+                else "Toca Pin y después un elemento de la página para crear una nota. ") + "Los dibujos nuevos siguen el centro del elemento seleccionado; los antiguos conservan coordenadas de página.",
                 color = tone.muted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
         }
         hint?.let { message ->

@@ -24,9 +24,10 @@ import kotlin.math.roundToInt
 class DocumentWebView(context: Context, val document: Document, private val repository: LibraryRepository,
     private val event: (JSONObject) -> Unit, private val console: (String) -> Unit,
     private val finished: (DocumentWebView) -> Unit, private val crashed: () -> Unit,
-    private val navigate: (String) -> Unit = {}) : WebView(context) {
+    private val navigate: (String) -> Unit = {},
+    private val exportRoot: java.io.File? = null) : WebView(context) {
     // Un renderer conserva una sola generación aunque sync publique otra mientras está abierto.
-    private val contentRoot = repository.original(document.id)
+    internal val contentRoot = exportRoot ?: repository.original(document.id)
     private val networkAllowed = document.networkAllowed && document.type != "WEB_SNAPSHOT"
     val origin = "https://d${document.id}.hypermarker.invalid"
     var sessionId = UUID.randomUUID().toString()

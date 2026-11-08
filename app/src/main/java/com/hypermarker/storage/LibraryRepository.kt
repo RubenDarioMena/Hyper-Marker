@@ -63,6 +63,7 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         if (recovered) return@write
         File(context.filesDir, "imports").deleteRecursively()
         File(context.cacheDir, "web-captures").deleteRecursively()
+        File(context.cacheDir, "feedback-exports").deleteRecursively()
         val existing = dao.documents().map { it.id }.toSet()
         File(context.filesDir, "documents").listFiles()?.filter { it.name !in existing }?.forEach { it.deleteRecursively() }
         dao.remoteFolders().forEach { remote ->
