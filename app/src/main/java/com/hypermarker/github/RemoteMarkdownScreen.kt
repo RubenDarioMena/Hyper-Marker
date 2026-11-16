@@ -21,7 +21,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebChromeClient
 import android.webkit.PermissionRequest
-import com.hypermarker.markdown.MarkdownPolicy
+import com.hypermarker.markdown.MarkdownProtection
 import com.hypermarker.storage.Document
 import com.hypermarker.storage.LibraryRepository
 import com.hypermarker.viewer.DocumentWebView
@@ -48,11 +48,12 @@ fun RemoteMarkdownScreen(document: Document, library: LibraryRepository, onClose
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
             Text("GitHub · solo lectura · copia offline", style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (source != null && !MarkdownPolicy.unsupported(source!!)) {
+            val shown = remember(source) { source?.let { MarkdownProtection.protect(it)?.text } }
+            if (shown != null) {
                 TextButton(onClick = { visual = !visual }) { Text(if (visual) "Ver fuente" else "Ver visual") }
             } else Spacer(Modifier.height(12.dp))
-            val markdown = source
-            if (visual && markdown != null && !MarkdownPolicy.unsupported(markdown)) {
+            val markdown = shown
+            if (visual && markdown != null) {
                 AndroidView(modifier = Modifier.fillMaxSize(), factory = {
                     WebView(context).apply {
                         settings.javaScriptEnabled = true

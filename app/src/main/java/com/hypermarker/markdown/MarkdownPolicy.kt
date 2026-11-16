@@ -2,7 +2,7 @@ package com.hypermarker.markdown
 
 object MarkdownPolicy {
     private val tableRow = Regex("^ {0,3}\\|.*\\|\\s*$")
-    private val tableDelimiter = Regex("^ {0,3}\\|(\\s*:?-{3,}:?\\s*\\|)+\\s*$")
+    private val tableDelimiter = Regex("^ {0,3}\\|(\\s*:?-+:?\\s*\\|)+\\s*$")
     private fun cells(line: String) = line.trim().removePrefix("|").removeSuffix("|").split(Regex("(?<!\\\\)\\|"))
 
     fun unsupported(source: String): Boolean {
@@ -19,7 +19,7 @@ object MarkdownPolicy {
         }
         if (fence != null) return true
         val text = tablesAsText(outside).joinToString("\n").replace(Regex("`+[^`\\n]*`+"), "")
-        return Regex("(?m)(^ {0,3}<|^ {0,3}\\[.+\\]:|^ {0,3}\\$\\$|^ {0,3}:::|^ {0,3}\\|.*\\||^ {0,3}[-*+] \\[|\\{[#.:]|!\\[|<[/!a-zA-Z])").containsMatchIn(text)
+        return Regex("(?m)(^ {0,3}<|^ {0,3}\\[.+\\]:|^ {0,3}\\$\\$|^ {0,3}:::|^ {0,3}\\|.*\\||^ {0,3}[-*+] \\[[ xX]\\]|\\{[#.:]|!\\[|<[/!a-zA-Z])").containsMatchIn(text)
     }
 
     /** Las tablas GFM bien formadas son editables en Visual; su contenido de celdas se sigue revisando. */

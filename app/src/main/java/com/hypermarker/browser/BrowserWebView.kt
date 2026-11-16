@@ -10,7 +10,7 @@ import com.hypermarker.viewer.DocumentWebView
 /** Navegación remota sin AssetLoader, bridge nativo ni acceso a archivos privados. */
 @SuppressLint("SetJavaScriptEnabled")
 class BrowserWebView(context: Context, private val changed: (BrowserWebView, Boolean) -> Unit,
-    private val problem: (String) -> Unit, private val crashed: () -> Unit) : WebView(context) {
+    private val problem: (String) -> Unit, private val crashed: () -> Unit, private val verifying: () -> Unit = {}) : WebView(context) {
     var capturing = false
     init {
         settings.apply {
@@ -29,10 +29,12 @@ class BrowserWebView(context: Context, private val changed: (BrowserWebView, Boo
             mediaPlaybackRequiresUserGesture = true; setGeolocationEnabled(false)
             safeBrowsingEnabled = true
         }
-        CookieManager.getInstance().setAcceptCookie(false)
+        // Cookies propias sólo durante la sesión del navegador (ver BrowserCookies): las verificaciones
+        // anti-bots como la de Cloudflare (raw.githack.com) no avanzan sin ellas.
+        BrowserCookies.begin()
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            for (asset in listOf("security/storage-bootstrap.js", "security/offline-bootstrap.js")) {
+            for (asset in listOf("security/storage-bootstrap.js", "security/browser-bootstrap.js")) {
                 WebViewCompat.addDocumentStartJavaScript(this, context.assets.open(asset).bufferedReader().use { it.readText() }, setOf("*"))
             }
         }
@@ -60,11 +62,35 @@ class BrowserWebView(context: Context, private val changed: (BrowserWebView, Boo
                 if (request?.isForMainFrame == true) problem("No se pudo abrir la página. Comprueba tu conexión y la dirección.")
             }
             override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?) {
-                if (request?.isForMainFrame == true) problem("La página respondió con HTTP ${response?.statusCode}.")
+                if (request?.isForMainFrame != true) return
+                if (BrowserCookies.isChallenge(response?.statusCode, response?.responseHeaders)) verifying()
+                else problem("La página respondió con HTTP ${response?.statusCode}.")
             }
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean { crashed(); return true }
         }
         setDownloadListener { _, _, _, _, _ -> problem("Para conservar esta página usa Descargar página. Para otros archivos, descárgalos e impórtalos desde la biblioteca.") }
     }
     fun open(address: String) { require(WebAddress.permitted(address)); loadUrl(address) }
+}
+
+/**
+ * Cookies del navegador remoto. `CookieManager` es global en el proceso: se aceptan cookies propias sólo
+ * mientras el navegador está abierto y se borran al entrar y al salir. El lector vuelve a deshabilitarlas
+ * (`DocumentWebView`) y sus documentos tienen origen opaco, así que no las reciben.
+ */
+object BrowserCookies {
+    private var sessions = 0
+    fun begin() { CookieManager.getInstance().setAcceptCookie(true) }
+    /** Llamar al abrir la pantalla: descarta restos de una sesión anterior interrumpida. */
+    fun enter() { if (sessions++ == 0) CookieManager.getInstance().removeAllCookies(null); begin() }
+    fun leave() {
+        if (--sessions > 0) return
+        sessions = 0
+        CookieManager.getInstance().apply { removeAllCookies(null); flush(); setAcceptCookie(false) }
+    }
+    /** Respuesta de verificación (p. ej. «Just a moment…» de Cloudflare): la propia página continúa sola. */
+    fun isChallenge(status: Int?, headers: Map<String, String>?): Boolean {
+        val values = headers.orEmpty().mapKeys { it.key.lowercase() }
+        return status in setOf(403, 429, 503) && values["cf-mitigated"].equals("challenge", true)
+    }
 }

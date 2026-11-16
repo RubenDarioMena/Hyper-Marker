@@ -60,6 +60,20 @@ class BridgeValidator(private val session: String, private val documentId: Strin
                 require(payload.getString("tool") in listOf("pen", "highlighter"))
             }
             "stroke.erase" -> require(mode == "DRAW")
+            "form.state" -> {
+                val fields = payload.getJSONArray("fields")
+                require(fields.length() <= 500)
+                for (i in 0 until fields.length()) {
+                    val field = fields.getJSONObject(i)
+                    require(field.keys().asSequence().all { it in setOf("k", "v", "c", "s", "h") })
+                    require(field.getString("k").length in 1..4200)
+                    if (field.has("v")) require(field.getString("v").length <= 20_000)
+                    if (field.has("h")) require(field.getString("h").length <= 20_000)
+                    if (field.has("c")) field.getBoolean("c")
+                    field.optJSONArray("s")?.let { values -> require(values.length() <= 500 && values.strings().all { it.length <= 1000 }) }
+                    require(field.has("v") || field.has("c") || field.has("s") || field.has("h"))
+                }
+            }
             else -> error("Evento no permitido")
         }
         message

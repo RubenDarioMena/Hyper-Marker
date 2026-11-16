@@ -54,7 +54,8 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
     private val redo = ArrayDeque<List<Annotation>>()
     private var saveJob: Job? = null
     init { viewModelScope.launch {
-        try { annotations = repository.annotations(document.id); preference = repository.preference(document.id); speed = preference.speed; direction = preference.direction; loaded = true }
+        try { annotations = repository.annotations(document.id); preference = repository.preference(document.id); speed = preference.speed; direction = preference.direction
+            forms = repository.readFormBuffer(document.id); formsSaved = forms.length() > 0; loaded = true }
         catch (e: Exception) { error = e.message }
     } }
     fun log(value: String) { logs.add(value.take(2200)); while (logs.size > 300) logs.removeAt(0) }
@@ -124,12 +125,29 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
             ?: JSONObject().put("anchor", data.getJSONObject("anchor")).put("original", info.getString("raw")).put("text", value)
         update(annotations.filterNot { it.id == existing?.id } + Annotation(existing?.id ?: UUID.randomUUID().toString(), document.id, "TEXT", page, payload.toString()))
     }
+    /** Valores escritos en formularios de la página, por pageKey: sobreviven a recargas, cierres y fallos del visor. */
+    private var forms = JSONObject()
+    private var formJob: Job? = null
+    var formsSaved by mutableStateOf(false); private set
+    fun formFields(page: String): JSONArray = forms.optJSONArray(page) ?: JSONArray()
+    fun formState(page: String, fields: JSONArray) {
+        if (fields.length() == 0) forms.remove(page) else forms.put(page, fields)
+        while (forms.length() > 50) forms.remove(forms.keys().next())
+        if (forms.toString().length > com.hypermarker.storage.FORM_BUFFER_LIMIT) { forms.remove(page); error = "Los formularios de esta página superan el límite del respaldo." }
+        formsSaved = forms.length() > 0
+        formJob?.cancel(); formJob = viewModelScope.launch { delay(250); writeForms() }
+    }
+    private suspend fun writeForms() {
+        try { repository.writeFormBuffer(document.id, JSONObject(forms.toString())) } catch (e: Exception) { error = "No se pudo respaldar el formulario: ${e.message}" }
+    }
+    fun clearForms() { forms = JSONObject(); formsSaved = false; formJob?.cancel(); formJob = viewModelScope.launch { writeForms() } }
     fun event(message: JSONObject, x: Float = 0f, y: Float = 0f) {
         if (!loaded) return
         val payload = message.getJSONObject("payload")
         val page = payload.optString("pageKey").take(4096)
         when (message.getString("type")) {
             "annotation.activated" -> openPin(payload.optString("id"))
+            "form.state" -> payload.optJSONArray("fields")?.let { formState(page, it) }
             "longpress" -> if (wheelsEnabled && (mode == "VIEW" || mode == "DRAW")) cross = CrossRequest(mode, payload, page, x, y)
             "target.selected" -> {
                 if (mode != "EDIT") return
@@ -169,7 +187,7 @@ class ReaderViewModel(val document: Document, private val repository: LibraryRep
         editor = null; editingId = null
     }
     fun retrySave() { error = null; persist(annotations) }
-    suspend fun flush(): Boolean { saveJob?.join(); if (!saved) { retrySave(); saveJob?.join() }; return saved }
+    suspend fun flush(): Boolean { formJob?.let { if (it.isActive) { it.cancel(); writeForms() } }; saveJob?.join(); if (!saved) { retrySave(); saveJob?.join() }; return saved }
     fun network(allowed: Boolean) { playing = false; pinArmed = false; mode = "VIEW"; viewModelScope.launch { try { repository.setNetwork(document.id, allowed) } catch (e: Exception) { error = e.message } } }
     fun savePosition(y: Int, zoom: Int, path: String?) {
         preference = ViewerPreference(document.id, zoom, y, speed, direction, path)

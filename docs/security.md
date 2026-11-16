@@ -27,6 +27,8 @@ La cobertura concreta incluye sockets TCP/UDP locales de prueba, Fetch, WebSocke
 
 ## Compatibilidad del almacenamiento web
 
+El respaldo de formularios (`form.state`) es un mensaje validado más: como mucho 500 campos con claves y valores acotados, sin contraseñas, archivos ni campos ocultos. Se guarda en privado fuera de la raíz servida y sólo se devuelve a la misma página del mismo documento; restaurar HTML de un `contenteditable` lo reinserta en el mismo origen opaco sin privilegios nuevos.
+
 El origen opaco impide cookies, IndexedDB y DOM storage nativo. Se emulan APIs comunes de `localStorage` y `sessionStorage` en memoria para permitir interactividad durante una sesión. Esos valores no se restauran al recrear/cerrar el visor. Las páginas que dependan de almacenamiento web persistente o comunicación directa entre frames tienen esta limitación explícita; no se oculta tras el permiso de red.
 
 Markdown, pines, trazos y preferencias se guardan en almacenamiento nativo privado. `AtomicFile` protege el Markdown; Room guarda metadatos y anotaciones. Backups automáticos y transferencia de datos están deshabilitados en el manifiesto/reglas de extracción; exportar/backup es una función posterior.
@@ -63,7 +65,7 @@ El presupuesto detecta cambios incompatibles entre reloj civil y monotónico den
 
 ## Navegación web y páginas descargadas (2026-11-02)
 
-La [ampliación autorizada](proposals/web-browser.md) introduce un WebView remoto independiente, sin bridge ni AssetLoader. Nunca sirve hosts internos ni permite `file://`, `content://`, permisos web, popups o HTTP claro. No comparte cookies con las páginas locales: continúan deshabilitadas. Un enlace HTTPS del lector abre esa pantalla sólo con gesto, sin ampliar el origen ni los archivos autorizados del documento.
+La [ampliación autorizada](proposals/web-browser.md) introduce un WebView remoto independiente, sin bridge ni AssetLoader. Nunca sirve hosts internos ni permite `file://`, `content://`, permisos web, popups o HTTP claro. No comparte cookies con las páginas locales: continúan deshabilitadas. Desde el 2026-11-16 acepta cookies propias, no de terceros, sólo mientras su pantalla está abierta, y las borra al entrar y salir (necesario para verificaciones como la de Cloudflare); conserva `Worker` pero no WebRTC. «Abrir en otra aplicación» entrega la URL HTTPS actual a Android sólo por gesto explícito. Un enlace HTTPS del lector abre esa pantalla sólo con gesto, sin ampliar el origen ni los archivos autorizados del documento.
 
 Los archivos MHTML se convierten con límites, nombres generados y compensación; `Content-Location` no es una ruta de disco. El archivo original se conserva fuera de la raíz servida. `WEB_SNAPSHOT` aplica CSP sin scripts originales, frames, conexiones, formularios ni bases externas; `blockNetworkLoads` e intercepción offline se mantienen aun ante un `networkAllowed=true` inconsistente. El controlador nativo se instala por `evaluateJavascript`, con el mismo contrato de anotaciones existente. La captura no depende de caché HTTP ni de una sesión remota. Los límites de escritura temporal de Chromium están descritos en la propuesta.
 

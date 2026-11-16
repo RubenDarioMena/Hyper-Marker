@@ -61,4 +61,18 @@ class BridgeValidatorTest {
         ids.getJSONObject("payload").put("pins", JSONArray().put("a".repeat(101)))
         assertNull(validator.validate(ids.toString(), "EDIT"))
     }
+    @Test fun formStateIsAcceptedInEveryModeWithBoundedFields() {
+        val validator = BridgeValidator("s", "d", 1)
+        fun form(request: String, vararg fields: JSONObject) = message("form.state", request = request)
+            .put("payload", JSONObject().put("pageKey", "/index.html").put("fields", JSONArray(fields.toList())))
+        val ok = form("f1", JSONObject().put("k", "#name").put("v", "Ana"), JSONObject().put("k", "#ok").put("c", true),
+            JSONObject().put("k", "#multi").put("s", JSONArray(listOf("a", "b"))), JSONObject().put("k", "#rich").put("h", "<b>x</b>"))
+        listOf("VIEW", "EDIT", "DRAW").forEachIndexed { i, mode -> assertNotNull(validator.validate(ok.put("requestId", "ok$i").toString(), mode)) }
+        assertNull(validator.validate(form("f2", JSONObject().put("k", "#a").put("v", "x".repeat(20_001))).toString(), "VIEW"))
+        assertNull(validator.validate(form("f3", JSONObject().put("k", "").put("v", "x")).toString(), "VIEW"))
+        assertNull(validator.validate(form("f4", JSONObject().put("k", "#a")).toString(), "VIEW"))
+        assertNull(validator.validate(form("f5", JSONObject().put("k", "#a").put("v", "x").put("extra", 1)).toString(), "VIEW"))
+        assertNull(validator.validate(form("f6", *Array(501) { JSONObject().put("k", "#a$it").put("v", "x") }).toString(), "VIEW"))
+        assertNotNull(validator.validate(form("f7").toString(), "VIEW"))
+    }
 }

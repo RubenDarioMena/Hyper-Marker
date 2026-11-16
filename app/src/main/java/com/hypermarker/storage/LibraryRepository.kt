@@ -15,6 +15,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
+const val FORM_BUFFER_LIMIT = 4_000_000
+
 class LibraryRepository(val context: Context, database: LibraryDatabase? = null) {
     val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
         .addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3).build()
@@ -42,6 +44,17 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         atomicWrite(File(directory(id), "remote-current"), sha)
     }
     private fun markdown(id: String) = File(directory(id), "markdown/source.md")
+    /** Respaldo de campos de formulario del lector, fuera de la raíz servida al WebView. */
+    private fun formBuffer(id: String) = File(directory(id), "form-buffer.json")
+    suspend fun readFormBuffer(id: String): org.json.JSONObject = withContext(Dispatchers.IO) {
+        runCatching { org.json.JSONObject(formBuffer(id).readText()) }.getOrDefault(org.json.JSONObject())
+    }
+    suspend fun writeFormBuffer(id: String, value: org.json.JSONObject) = write {
+        if (dao.document(id) == null) return@write
+        val text = value.toString()
+        require(text.length <= FORM_BUFFER_LIMIT) { "El respaldo de formularios supera el límite" }
+        if (value.length() == 0) formBuffer(id).delete() else atomicWrite(formBuffer(id), text)
+    }
     private fun name(value: String) = value.trim().also { require(it.isNotEmpty() && it.length <= 200) { "Usa un nombre de 1 a 200 caracteres" } }
     private suspend fun <T> write(block: suspend () -> T): T = withContext(Dispatchers.IO) { mutex.withLock { block() } }
     internal suspend fun <T> remoteMutation(block: suspend () -> T): T = write(block)

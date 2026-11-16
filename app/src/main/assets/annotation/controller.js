@@ -292,11 +292,75 @@
   function autoscroll(time) {if(!autoSpeed)return;if(autoLast)window.scrollBy(0,autoSpeed*(time-autoLast)/1000);autoLast=time;autoFrame=requestAnimationFrame(autoscroll);}
   function stopAuto(){autoSpeed=0;autoLast=0;cancelAnimationFrame(autoFrame);}
   listen(document,'touchstart',stopAuto,{passive:true});
+  // Respaldo de formularios: lo escrito o elegido se envía a Android y se restaura al recargar o recrear el visor.
+  const forms={dirty:new Map(),timer:0,retry:0,restoring:false};
+  const skipInput=/^(password|hidden|file|submit|button|reset|image)$/i;
+  const valueSetter=el=>Object.getOwnPropertyDescriptor(({input:HTMLInputElement,textarea:HTMLTextAreaElement,select:HTMLSelectElement})[el.localName]?.prototype||{},'value')?.set;
+  function formRoot(node){
+    if(!(node instanceof Element)||own(node)||host.contains(node))return null;
+    if(node.localName==='input')return skipInput.test(node.type)||/(cc-|one-time-code|password)/i.test(node.autocomplete||'')?null:node;
+    if(node.localName==='textarea'||node.localName==='select')return node;
+    return node.isContentEditable?node.closest('[contenteditable]:not([contenteditable="false"])'):null;
+  }
+  function fieldState(el){
+    const k=selector(el).slice(0,4200);
+    if(el.localName==='input'&&/^(checkbox|radio)$/i.test(el.type))return {k,c:el.checked};
+    if(el.localName==='select'&&el.multiple)return {k,s:Array.from(el.selectedOptions).slice(0,500).map(o=>o.value.slice(0,1000))};
+    if(/^(input|textarea|select)$/.test(el.localName))return {k,v:String(el.value).slice(0,20000)};
+    return el.innerHTML.length<=20000?{k,h:el.innerHTML}:{k,v:(el.textContent||'').slice(0,20000)};
+  }
+  function sendForms(){
+    clearTimeout(forms.timer);forms.timer=0;
+    const fields=[];let size=0;
+    for(const value of Array.from(forms.dirty.values()).reverse()){size+=JSON.stringify(value).length;if(size>450000||fields.length>=500)break;fields.unshift(value);}
+    send('form.state',{fields});
+  }
+  function record(el){
+    if(el.localName==='input'&&el.type==='radio'&&el.name){
+      const scope=el.form||document;
+      for(const radio of scope.querySelectorAll('input[type=radio]'))if(radio.name===el.name&&formRoot(radio)){const value=fieldState(radio);forms.dirty.set(value.k,value);}
+    } else {const value=fieldState(el);forms.dirty.set(value.k,value);}
+    clearTimeout(forms.timer);forms.timer=setTimeout(sendForms,400);
+  }
+  function onForm(e){if(forms.restoring)return;const el=formRoot(e.target);if(el)record(el);}
+  listen(document,'input',onForm,true);listen(document,'change',onForm,true);
+  listen(document,'reset',e=>setTimeout(()=>{if(e.target?.elements)for(const el of e.target.elements){const root=formRoot(el);if(root)record(root);}},0),true);
+  const flushForms=()=>{if(forms.timer)sendForms();};
+  listen(window,'pagehide',flushForms);listen(document,'visibilitychange',()=>{if(document.hidden)flushForms();});
+  function fire(el){el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
+  function applyField(field){
+    let el;try{el=document.querySelector(field.k);}catch(_){return true;}
+    el=el&&formRoot(el);
+    if(!el)return false;
+    if('c' in field){if(el.checked!==field.c){el.checked=!!field.c;fire(el);}}
+    else if(Array.isArray(field.s)){if(el.options){for(const option of el.options)option.selected=field.s.includes(option.value);fire(el);}}
+    else if(/^(input|textarea|select)$/.test(el.localName)){if(el.value!==field.v){const set=valueSetter(el);set?set.call(el,field.v):el.value=field.v;fire(el);}}
+    else if('h' in field){if(el.innerHTML!==field.h){el.innerHTML=field.h;fire(el);}}
+    else if(el.textContent!==field.v){el.textContent=field.v;fire(el);}
+    forms.dirty.set(field.k,field);
+    return true;
+  }
+  function restoreForms(fields){
+    clearInterval(forms.retry);
+    let pending=fields.filter(field=>field&&typeof field.k==='string');
+    // Se conservan aunque su campo aún no exista, para no perderlos si se envía otro cambio antes.
+    for(const field of pending)forms.dirty.set(field.k,field);
+    const started=performance.now();
+    const attempt=()=>{
+      forms.restoring=true;
+      try{pending=pending.filter(field=>!applyField(field));}finally{forms.restoring=false;}
+      // Páginas que generan el formulario después de cargar: se reintenta unos segundos.
+      if(!pending.length||performance.now()-started>15000){clearInterval(forms.retry);}
+    };
+    attempt();
+    if(pending.length)forms.retry=setInterval(attempt,400);
+  }
   window.HyperMarker={
     init(config){state.config=config;send('controller.ready');schedule();},
     command(type,payload){
       if(type==='mode'){if(payload.mode!==state.mode){state.drawTarget=null;}cancel();stopAuto();state.mode=payload.mode;state.accessible=!!payload.accessible;state.wheelsEnabled=payload.wheelsEnabled!==false;document.documentElement.dataset.hypermarkerMode=state.mode;}
       if(type==='annotations'){state.annotations=payload;lastUnresolved='';}
+      if(type==='form.restore'){restoreForms(Array.isArray(payload.fields)?payload.fields:[]);}
       if(type==='tool'){state.tool=payload.tool;state.color=payload.color;state.width=payload.width;}
       if(type==='selectTarget'){
         const el=document.querySelector(payload.selector);if(el){el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();selectAt(r.left+r.width/2,r.top+r.height/2);
@@ -319,6 +383,6 @@
       return {context,paths};
     },
     accessibleTargets(){return Array.from(document.querySelectorAll('h1,h2,h3,p,li,a,button,canvas,svg,img,iframe,input')).filter(el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1&&r.bottom>0&&r.top<innerHeight;}).slice(0,150).map(el=>({selector:selector(el),label:el.localName+' · '+(snippetOf(el)||el.getAttribute('alt')||'Superficie visual').slice(0,100)}));},
-    destroy(){cancel();stopAuto();observer.disconnect();removals.forEach(remove=>remove());for(const el of Array.from(applied.keys()))restore(el);host.remove();css.remove();delete document.documentElement.dataset.hypermarkerMode;delete window.HyperMarker;}
+    destroy(){flushForms();clearInterval(forms.retry);cancel();stopAuto();observer.disconnect();removals.forEach(remove=>remove());for(const el of Array.from(applied.keys()))restore(el);host.remove();css.remove();delete document.documentElement.dataset.hypermarkerMode;delete window.HyperMarker;}
   };
 })();

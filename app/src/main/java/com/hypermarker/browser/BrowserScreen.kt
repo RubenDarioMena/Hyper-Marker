@@ -1,5 +1,7 @@
 package com.hypermarker.browser
 
+import android.content.Intent
+import androidx.core.net.toUri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -8,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -41,6 +45,8 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
         }.onFailure { model.error = it.message }
     }
     BackHandler { if (!model.saving) { if (web?.canGoBack() == true) web?.goBack() else onClose() } }
+    DisposableEffect(Unit) { BrowserCookies.enter(); onDispose { BrowserCookies.leave() } }
+    val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, web) {
         val observer = LifecycleEventObserver { _, event ->
@@ -62,12 +68,21 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
             IconButton(onClick = { web?.goBack() }, enabled = model.back && !model.saving) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Página anterior") }
             IconButton(onClick = { web?.goForward() }, enabled = model.forward && !model.saving) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Página siguiente") }
             IconButton(onClick = { if (model.failed) { model.failed = false; model.generation++ } else web?.reload() }, enabled = !model.saving && model.currentUrl != null) { Icon(Icons.Outlined.Refresh, "Recargar página") }
+            // Alternativa para sitios que el navegador integrado no admite (inicios de sesión, descargas…).
+            IconButton(onClick = {
+                model.currentUrl?.takeIf(WebAddress::permitted)?.let { url ->
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)) }
+                        .onFailure { model.error = "No hay otra aplicación para abrir esta dirección." }
+                }
+            }, enabled = !model.saving && model.currentUrl?.let(WebAddress::permitted) == true) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, "Abrir en otra aplicación") }
             TextButton(onClick = { web?.let { model.save(it, folderId) } }, enabled = model.canSave) {
                 Icon(Icons.Outlined.Download, null); Spacer(Modifier.width(6.dp)); Text(if (model.saving) "Descargando…" else "Descargar página")
             }
         }
         if (model.loading || model.saving) LinearProgressIndicator(Modifier.fillMaxWidth())
         model.error?.let { Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) }
+        if (model.verifying) Text("El sitio está verificando el navegador; la página continuará sola en unos segundos.",
+            Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall)
         model.savedId?.let { id ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Guardada sin conexión", Modifier.weight(1f))
@@ -84,7 +99,7 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
                 AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                     BrowserWebView(context, model::started, model::loadProblem, crashed = {
                         model.failed = true; model.loading = false; model.error = "El navegador se cerró. Pulsa Recargar para volver a abrir la página."
-                    }).also { view ->
+                    }, verifying = model::verifyingPage).also { view ->
                         web = view
                         val url = if (initialUrl != null && initialUrl != lastInitial) initialUrl else model.currentUrl
                         lastInitial = initialUrl
