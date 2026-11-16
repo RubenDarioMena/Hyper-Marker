@@ -1,6 +1,6 @@
 # Progreso y relevo
 
-Última actualización: **2026-11-02** (America/Mexico_City).
+Última actualización: **2026-11-16** (America/Mexico_City).
 
 ## Estado real
 
@@ -183,3 +183,12 @@ Siguiente paso concreto:
 - `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew assembleDebug --offline`: **BUILD SUCCESSFUL** con las funciones integradas. APK local `artifacts/Hyper-Marker-feedback-main-debug.apk`, SHA-256 `a68425d53eb28cb9336b511058ed392dc635128fde510caba0868eda4e25d5af`; paquete `com.hypermarker`, versión `1.0.0` (1), min API 26, target API 36, firma SHA-256 `42909c43e7ba7038ddba222d89f78a491b653268f5c67da86d3cbff3b8742853`.
 - El APK versionado en `downloads/Hyper-Marker-feedback-debug.apk` tiene firma SHA-256 distinta (`4452e12f73a79a348ce11cf4f0e4818aab5483258e6b7b00d4441e8328a5c303`); el APK local se conserva por separado para dispositivos con la firma `42909c43…`. `adb devices -l` no detectó teléfonos/tablets: sin respaldos ni instalación en esta sesión.
 - Publicado en `origin/main` mediante fast-forward más el commit documental `a4ec285`. Pendiente: al conectar los dispositivos, hacer respaldo fresco y comprobar firma/datos antes de instalar. La app aún declara `1.0.0` (1), así que esta entrega no cambia el versionCode.
+
+## Propuesta de rediseño, Flow atrevido y selector de elementos (2026-11-16)
+
+- Fuente: `bed525a`, rama `claude/relaxed-brahmagupta-eop7d6`, árbol limpio al comenzar. **Sólo documentación; sin cambios de código, build ni pruebas en esta sesión.**
+- Entrada: diseño del propietario «Rediseño de la app» (8 pantallas: Biblioteca, Crear o importar, Navegador, Carpeta de GitHub, Lector Ver/Editar, Nota Markdown, Flow Dots) y su pedido de un Flow más atrevido: puntos con «foto de perfil», punto que se expande con la vista previa de su documento, menú radial con mini-vistas cuando hay varios elementos relacionados, y un selector de elementos mejor para mover y para relacionar elementos con un punto.
+- Entregado: [docs/proposals/ui-redesign.md](docs/proposals/ui-redesign.md) con tokens del diseño, cambios por pantalla frente al código actual, modelo de datos propuesto (Room v4: columnas de foto en `flow_nodes`, tabla `flow_node_links`, `lastOpenedAt`), módulo de vistas previas, selector con tres modos, fases R0–R7, seguridad, riesgos y pruebas a registrar. Maquetas estáticas de las pantallas 9–14 en un lienzo privado del propietario, enlazado desde la propuesta.
+- **Nada de esto está autorizado ni implementado.** Es una propuesta; la especificación original no se modificó. Las siete decisiones pendientes del propietario están al final de la propuesta.
+- No verificado: las maquetas no se renderizaron ni revisaron en dispositivo; la viabilidad de la miniatura HTML fuera de pantalla y el rendimiento con muchas fotos son supuestos por validar en R2/R3.
+- Siguiente paso concreto: el propietario revisa el lienzo y responde las decisiones 1–7. Con autorización, empezar por R0 (tema y componentes) y R1 (selector en modo Destino, sustituye «Mover a…»).
