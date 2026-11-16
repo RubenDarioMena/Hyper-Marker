@@ -1,0 +1,28 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-16T05:10:00Z"},
+  "title": "Flow atrevido y selector",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "9 · Flow · Lienzo con fotos"},
+    "Flow-Preview.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "10 · Flow · Punto abierto"},
+    "Flow-Radial.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "11 · Flow · Menú radial"},
+    "Flow-Avatar.dc.html": {"x": 1410, "y": 0, "w": 390, "h": 844, "title": "12 · Flow · Foto del punto"},
+    "Picker-Move.dc.html": {"x": 0, "y": 1244, "w": 390, "h": 844, "title": "13 · Selector · Mover a"},
+    "Picker-Attach.dc.html": {"x": 470, "y": 1244, "w": 390, "h": 844, "title": "14 · Selector · Relacionar con un punto"}
+  },
+  "order": [
+    "Main.dc.html",
+    "Flow-Preview.dc.html",
+    "Flow-Radial.dc.html",
+    "Flow-Avatar.dc.html",
+    "Picker-Move.dc.html",
+    "Picker-Attach.dc.html"
+  ],
+  "notes": {
+    "t-flow": {"x": 0, "y": -300, "text": "Flow atrevido", "kind": "title1", "maxW": 1800},
+    "t-picker": {"x": 0, "y": 944, "text": "Selector de elementos", "kind": "title1", "maxW": 860}
+  },
+  "designSystems": []
+}

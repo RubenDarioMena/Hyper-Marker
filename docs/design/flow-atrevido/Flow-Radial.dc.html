@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Flow · Menú radial de elementos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;border:0;background:none;padding:0;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background-color: #0C1512; background-image: radial-gradient(#232E2A 1.2px, transparent 1.3px); background-size: 28px 28px; color: #FFFDF7; font-family: Inter, system-ui, sans-serif; position: relative; overflow: hidden">
+
+<header style="position: absolute; left: 12px; right: 12px; top: 52px; display: flex; align-items: center; gap: 8px; opacity: 0.45">
+<span aria-hidden="true" style="width: 48px; height: 48px; box-sizing: border-box; border-radius: 24px; background: #1E2A26; border: 1px solid #3A4641; display: flex; align-items: center; justify-content: center; flex: none">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>
+</span>
+<span style="flex: 1; min-width: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600">Mapa de ideas</span>
+</header>
+
+<p style="position: absolute; left: 0; right: 0; top: 150px; margin: 0; text-align: center; font-size: 13px; line-height: 18px; color: #D6DDD9">Gira el anillo para ver más · toca el centro para cerrar</p>
+
+<div aria-hidden="true" style="position: absolute; left: 57px; top: 262px; width: 276px; height: 276px; box-sizing: border-box; border-radius: 138px; border: 2px dashed #3F5A50"></div>
+<svg aria-hidden="true" width="108" height="86" style="position: absolute; left: 195px; top: 314px"><path d="M0 86 L108 0" stroke="#89D5BC" stroke-width="2.5" stroke-linecap="round" fill="none"></path></svg>
+
+<button aria-label="Cerrar el menú de Anotar, 11 elementos relacionados" style="position: absolute; left: 135px; top: 354px; width: 120px; display: flex; flex-direction: column; align-items: center">
+<span aria-hidden="true" style="width: 92px; height: 92px; border-radius: 46px; overflow: hidden; display: block; box-shadow: 0 0 0 3px #0C1512, 0 0 0 7px #E5B62F">
+<svg width="92" height="92"><rect width="92" height="92" fill="#D5EBE3"></rect><circle cx="64" cy="28" r="12" fill="#E5B62F"></circle><path d="M0 64 Q26 41 49 59 T92 54 V92 H0Z" fill="#176B5B"></path><path d="M0 79 Q31 64 56 77 T92 74 V92 H0Z" fill="#0F4D41"></path></svg>
+</span>
+<span style="margin-top: -10px; position: relative; background: #E5B62F; color: #14201C; font-size: 13px; font-weight: 600; line-height: 18px; padding: 4px 10px; border-radius: 13px">Anotar · 11</span>
+</button>
+
+<button aria-label="Ejemplo interactivo, HTML" style="position: absolute; left: 159px; top: 218px; width: 72px; height: 88px; box-sizing: border-box; padding: 6px; border-radius: 16px; background: #FFFDF7; color: #14201C; display: flex; flex-direction: column; gap: 4px; text-align: left">
+<svg aria-hidden="true" width="60" height="50"><rect width="60" height="50" rx="10" fill="#FFFFFF" stroke="#D9D5C8"></rect><rect x="8" y="9" width="26" height="5" rx="2.5" fill="#14201C"></rect><rect x="8" y="19" width="44" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="25" width="36" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="32" width="44" height="11" rx="3" fill="#E3F0EB"></rect></svg>
+<span style="font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Ejemplo int…</span>
+</button>
+
+<button aria-label="Notas del ejemplo, Markdown. Elemento en foco" aria-pressed="true" style="position: absolute; left: 267px; top: 270px; width: 72px; height: 88px; box-sizing: border-box; padding: 6px; border-radius: 16px; background: #FFFDF7; color: #14201C; display: flex; flex-direction: column; gap: 4px; text-align: left; box-shadow: 0 0 0 3px #0C1512, 0 0 0 6px #89D5BC">
+<svg aria-hidden="true" width="60" height="50"><rect width="60" height="50" rx="10" fill="#FFFFFF" stroke="#D9D5C8"></rect><rect x="8" y="9" width="30" height="5" rx="2.5" fill="#14201C"></rect><circle cx="10" cy="22" r="2" fill="#176B5B"></circle><rect x="16" y="20.5" width="34" height="3" rx="1.5" fill="#A9A69A"></rect><circle cx="10" cy="30" r="2" fill="#176B5B"></circle><rect x="16" y="28.5" width="28" height="3" rx="1.5" fill="#A9A69A"></rect><circle cx="10" cy="38" r="2" fill="#176B5B"></circle><rect x="16" y="36.5" width="32" height="3" rx="1.5" fill="#A9A69A"></rect></svg>
+<span style="font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Notas del ej…</span>
+</button>
+
+<button aria-label="Guía GitHub Sync, página web sin conexión" style="position: absolute; left: 293px; top: 387px; width: 72px; height: 88px; box-sizing: border-box; padding: 6px; border-radius: 16px; background: #FFFDF7; color: #14201C; display: flex; flex-direction: column; gap: 4px; text-align: left">
+<svg aria-hidden="true" width="60" height="50"><rect width="60" height="50" rx="10" fill="#FFFFFF" stroke="#D9D5C8"></rect><circle cx="14" cy="14" r="6" fill="none" stroke="#176B5B" stroke-width="1.6"></circle><path d="M8 14h12M14 8c-3 4-3 8 0 12M14 8c3 4 3 8 0 12" fill="none" stroke="#176B5B" stroke-width="1.2"></path><rect x="25" y="12" width="26" height="4" rx="2" fill="#14201C"></rect><rect x="8" y="27" width="44" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="33" width="44" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="39" width="30" height="3" rx="1.5" fill="#A9A69A"></rect></svg>
+<span style="font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Guía Sync</span>
+</button>
+
+<button aria-label="Mapa de ideas, Flow" style="position: absolute; left: 219px; top: 480px; width: 72px; height: 88px; box-sizing: border-box; padding: 6px; border-radius: 16px; background: #FFFDF7; color: #14201C; display: flex; flex-direction: column; gap: 4px; text-align: left">
+<svg aria-hidden="true" width="60" height="50"><rect width="60" height="50" rx="10" fill="#14201C"></rect><path d="M30 14L16 36M30 14l14 22" stroke="#89D5BC" stroke-width="1.6" fill="none"></path><circle cx="30" cy="14" r="5" fill="#E5B62F"></circle><circle cx="16" cy="36" r="4" fill="#89D5BC"></circle><circle cx="44" cy="36" r="4" fill="#89D5BC"></circle></svg>
+<span style="font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Otro mapa</span>
+</button>
+
+<button aria-label="docs, carpeta de GitHub" style="position: absolute; left: 99px; top: 480px; width: 72px; height: 88px; box-sizing: border-box; padding: 6px; border-radius: 16px; background: #FFFDF7; color: #14201C; display: flex; flex-direction: column; gap: 4px; text-align: left">
+<svg aria-hidden="true" width="60" height="50"><rect width="60" height="50" rx="10" fill="#E3F0EB"></rect><path d="M17 17h9l3 4h14v14H17z" fill="none" stroke="#176B5B" stroke-width="2" stroke-linejoin="round"></path></svg>
+<span style="font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">docs</span>
+</button>
+
+<button aria-label="README, Markdown de GitHub" style="position: absolute; left: 24px; top: 387px; width: 72px; height: 88px; box-sizing: border-box; padding: 6px; border-radius: 16px; background: #FFFDF7; color: #14201C; display: flex; flex-direction: column; gap: 4px; text-align: left">
+<svg aria-hidden="true" width="60" height="50"><rect width="60" height="50" rx="10" fill="#FFFFFF" stroke="#D9D5C8"></rect><rect x="8" y="9" width="22" height="5" rx="2.5" fill="#14201C"></rect><rect x="8" y="19" width="44" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="25" width="44" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="31" width="38" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="8" y="37" width="24" height="3" rx="1.5" fill="#A9A69A"></rect></svg>
+<span style="font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">README</span>
+</button>
+
+<button aria-label="Ver los otros 5 elementos" style="position: absolute; left: 51px; top: 270px; width: 72px; height: 88px; box-sizing: border-box; border-radius: 16px; background: #1E2A26; border: 2px dashed #89D5BC; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; line-height: 26px">+5</span>
+<span style="font-size: 12px; font-weight: 500; line-height: 16px; color: #D6DDD9">más</span>
+</button>
+
+<section aria-label="Elemento en foco" style="position: absolute; left: 12px; right: 12px; bottom: 28px; box-sizing: border-box; background: #FFFDF7; color: #14201C; border-radius: 28px; padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 24px 48px rgba(0,0,0,0.5)">
+<div style="display: flex; align-items: center; gap: 12px">
+<span aria-hidden="true" style="width: 48px; height: 48px; border-radius: 14px; background: #E3F0EB; color: #176B5B; display: flex; align-items: center; justify-content: center; flex: none">
+<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"></path></svg>
+</span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Notas del ejemplo</h2>
+<p style="margin: 0; font-size: 13px; line-height: 18px; color: #56615C">Markdown · 2 de 11</p>
+</div>
+</div>
+<div style="display: flex; gap: 8px">
+<button style="flex: 1; height: 48px; border-radius: 24px; background: #176B5B; color: #FFFFFF; font-size: 15px; font-weight: 600">Abrir</button>
+<button style="flex: 1; height: 48px; box-sizing: border-box; border-radius: 24px; border: 1px solid #D9D5C8; background: #FFFFFF; font-size: 15px; font-weight: 500">Ver los 11</button>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

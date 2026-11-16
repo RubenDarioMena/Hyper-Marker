@@ -4,8 +4,8 @@ Estado: **autorizada por el propietario el 2026-11-16 como trabajo nuevo previo 
 
 ## Fuentes
 
-- Diseño del propietario «Rediseño de la app»: 8 pantallas de 390×844 (Biblioteca, Crear o importar, Navegador, Añadir carpeta de GitHub, Lector · Ver, Lector · Editar con cruceta, Nota Markdown, Flow Dots). El archivo (3,4 MB) no se versiona.
-- Lienzo complementario con las pantallas 9–14 de esta propuesta: <https://claude.ai/artifact/WG3ikDpte5YG16rgpY2iec> (privado del propietario hasta que lo comparta). Son maquetas estáticas; las fotos de los puntos son ilustraciones de relleno.
+- Diseño del propietario «Rediseño de la app»: 8 pantallas de 390×844 (Biblioteca, Crear o importar, Navegador, Añadir carpeta de GitHub, Lector · Ver, Lector · Editar con cruceta, Nota Markdown, Flow Dots). Copia en [docs/design/rediseno-de-la-app.html](../design/rediseno-de-la-app.html).
+- Lienzo complementario con las pantallas 9–14 de esta propuesta: <https://claude.ai/artifact/WG3ikDpte5YG16rgpY2iec> (privado del propietario hasta que lo comparta). Fuentes en [docs/design/flow-atrevido/](../design/README.md). Son maquetas estáticas; las fotos de los puntos son ilustraciones de relleno.
 - Código revisado en `bed525a`: `MainActivity.kt`, `library/`, `flow/`, `storage/LibraryDatabase.kt` (Room v3), `storage/LibraryRepository.kt`, `viewer/Glass.kt`.
 
 ## Lenguaje visual que fija el diseño

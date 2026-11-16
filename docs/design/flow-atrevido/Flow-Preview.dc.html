@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Flow · Punto abierto con vista previa</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;border:0;background:none;padding:0;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background-color: #0C1512; background-image: radial-gradient(#232E2A 1.2px, transparent 1.3px); background-size: 28px 28px; color: #FFFDF7; font-family: Inter, system-ui, sans-serif; position: relative; overflow: hidden">
+
+<header style="position: absolute; left: 12px; right: 12px; top: 52px; display: flex; align-items: center; gap: 8px; opacity: 0.45">
+<span aria-hidden="true" style="width: 48px; height: 48px; box-sizing: border-box; border-radius: 24px; background: #1E2A26; border: 1px solid #3A4641; display: flex; align-items: center; justify-content: center; flex: none">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>
+</span>
+<span style="flex: 1; min-width: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600">Mapa de ideas</span>
+</header>
+
+<div aria-hidden="true" style="position: absolute; left: 135px; top: 110px; width: 120px; display: flex; flex-direction: column; align-items: center; opacity: 0.6">
+<span style="width: 56px; height: 56px; border-radius: 28px; overflow: hidden; display: block; box-shadow: 0 0 0 3px #0C1512, 0 0 0 5px #E5B62F">
+<svg width="56" height="56"><rect width="56" height="56" fill="#D5EBE3"></rect><circle cx="39" cy="17" r="7" fill="#E5B62F"></circle><path d="M0 39 Q16 25 30 36 T56 33 V56 H0Z" fill="#176B5B"></path><path d="M0 48 Q19 39 34 47 T56 45 V56 H0Z" fill="#0F4D41"></path></svg>
+</span>
+<span style="margin-top: -8px; position: relative; background: #FFFDF7; color: #14201C; font-size: 12px; font-weight: 600; line-height: 16px; padding: 3px 9px; border-radius: 11px">Anotar</span>
+</div>
+<svg aria-hidden="true" width="135" height="40" style="position: absolute; left: 70px; top: 178px"><path d="M125 4 C125 30, 50 2, 14 30" stroke="#89D5BC" stroke-width="2.5" stroke-linecap="round" fill="none"></path></svg>
+
+<section aria-label="Punto abierto: Guía Sync" style="position: absolute; left: 12px; right: 12px; top: 226px; bottom: 24px; box-sizing: border-box; background: #FFFDF7; color: #14201C; border-radius: 28px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 0 0 2px #89D5BC, 0 24px 48px rgba(0,0,0,0.5)">
+
+<span aria-hidden="true" style="position: absolute; left: 16px; top: -32px; width: 64px; height: 64px; border-radius: 32px; overflow: hidden; display: block; box-shadow: 0 0 0 3px #FFFDF7, 0 0 0 6px #89D5BC">
+<svg width="64" height="64"><rect width="64" height="64" fill="#FFFFFF"></rect><rect x="15" y="15" width="25" height="5" rx="2.5" fill="#14201C"></rect><rect x="15" y="25" width="34" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="15" y="32" width="34" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="15" y="39" width="23" height="3" rx="1.5" fill="#A9A69A"></rect><rect x="15" y="46" width="34" height="8" rx="2" fill="#176B5B"></rect></svg>
+</span>
+
+<div style="display: flex; align-items: flex-start; gap: 8px; padding-left: 76px; min-height: 48px">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; line-height: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Guía Sync</h2>
+<p style="margin: 0; font-size: 13px; line-height: 18px; color: #56615C">Página web sin conexión · 1 elemento</p>
+</div>
+<button aria-label="Cerrar y volver al lienzo" style="width: 44px; height: 44px; border-radius: 22px; background: #F1EEE3; display: flex; align-items: center; justify-content: center; flex: none">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+
+<button aria-label="Vista previa de Guía GitHub Sync. Toca para abrir el documento" style="flex: 1; min-height: 0; position: relative; display: block; text-align: left; background: #FFFFFF; border: 1px solid #D9D5C8; border-radius: 20px; overflow: hidden">
+<span style="display: flex; flex-direction: column; gap: 10px; padding: 18px 18px 0">
+<span style="font-size: 11px; line-height: 14px; color: #56615C">RubenDarioMena / Hyper-Marker / docs</span>
+<span style="font-size: 22px; font-weight: 600; line-height: 28px">Guía GitHub Sync</span>
+<span style="font-size: 13px; line-height: 20px; color: #2B3531">Añade una carpeta de un repositorio y léela sin conexión. La copia llega en solo lectura; tus pines y dibujos se guardan aparte.</span>
+<span style="display: flex; align-items: center; justify-content: center; height: 64px; border-radius: 12px; background: #E3F0EB; color: #176B5B; font-size: 13px; font-weight: 500">Cuenta · Repositorio · Rama · Carpeta</span>
+<span style="font-size: 16px; font-weight: 600; line-height: 22px">Antes de empezar</span>
+<span style="font-size: 13px; line-height: 20px; color: #2B3531">Crea un token de acceso con permiso de lectura. Se cifra en este dispositivo y nunca se comparte con las páginas.</span>
+<span style="font-size: 13px; line-height: 20px; color: #2B3531">Elige la rama y la carpeta. Las subcarpetas se revisan al sincronizar.</span>
+</span>
+<span style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(rgba(255,255,255,0), #FFFFFF)"></span>
+<span style="position: absolute; left: 12px; bottom: 12px; padding: 6px 12px; border-radius: 16px; background: #14201C; color: #FFFDF7; font-size: 12px; font-weight: 500; line-height: 16px">Vista previa · 2 pines</span>
+</button>
+
+<p style="margin: 0; padding: 0 4px; font-size: 14px; line-height: 20px; color: #56615C">Nota del punto: revisar antes de añadir la carpeta «docs».</p>
+
+<button style="height: 48px; border-radius: 24px; background: #176B5B; color: #FFFFFF; font-size: 15px; font-weight: 600; flex: none">Abrir documento</button>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; flex: none">
+<button style="height: 56px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 500">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>
+Conectar
+</button>
+<button style="height: 56px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 500">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path><rect x="3" y="3" width="18" height="18" rx="5"></rect></svg>
+Relacionar
+</button>
+<button style="height: 56px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 500">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="10" r="3"></circle><path d="M6.5 18.5c1.2-2.4 3.2-3.5 5.5-3.5s4.3 1.1 5.5 3.5"></path></svg>
+Foto
+</button>
+<button style="height: 56px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 500; color: #A3302A">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13"></path></svg>
+Eliminar
+</button>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

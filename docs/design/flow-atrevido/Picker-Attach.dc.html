@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Selector · Relacionar con un punto</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;border:0;background:none;padding:0;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0C1512; color: #14201C; font-family: Inter, system-ui, sans-serif; position: relative; overflow: hidden">
+
+<section aria-label="Relacionar elementos con el punto Anotar" style="position: absolute; left: 0; right: 0; top: 44px; bottom: 0; box-sizing: border-box; background: #FFFDF7; border-radius: 28px 28px 0 0; padding: 10px 16px 0; display: flex; flex-direction: column; gap: 12px">
+<span aria-hidden="true" style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: #C9C5B8; flex: none"></span>
+
+<div style="display: flex; align-items: center; gap: 12px; flex: none">
+<span aria-hidden="true" style="width: 48px; height: 48px; border-radius: 24px; overflow: hidden; display: block; flex: none; box-shadow: 0 0 0 2px #FFFDF7, 0 0 0 4px #E5B62F">
+<svg width="48" height="48"><rect width="48" height="48" fill="#D5EBE3"></rect><circle cx="34" cy="15" r="6" fill="#E5B62F"></circle><path d="M0 34 Q14 21 26 31 T48 28 V48 H0Z" fill="#176B5B"></path><path d="M0 42 Q16 33 29 40 T48 39 V48 H0Z" fill="#0F4D41"></path></svg>
+</span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<span style="font-size: 12px; font-weight: 600; line-height: 18px; letter-spacing: 0.08em; color: #56615C">RELACIONAR CON</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Anotar</h2>
+</div>
+<button aria-label="Cancelar" style="width: 44px; height: 44px; border-radius: 22px; background: #F1EEE3; display: flex; align-items: center; justify-content: center; flex: none">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+
+<label style="height: 48px; flex: none; box-sizing: border-box; padding: 0 16px; border-radius: 24px; border: 1px solid #D9D5C8; background: #FFFFFF; display: flex; align-items: center; gap: 10px">
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="#56615C" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+<input type="search" aria-label="Buscar en toda la biblioteca" placeholder="Buscar en toda la biblioteca" style="flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 15px; color: #14201C">
+</label>
+
+<div aria-label="Filtrar por tipo" style="display: flex; gap: 8px; flex: none; margin-right: -16px; overflow: hidden">
+<button aria-pressed="true" style="height: 40px; padding: 0 16px; border-radius: 20px; background: #14201C; color: #FFFDF7; font-size: 14px; font-weight: 600; flex: none">Todo</button>
+<button style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #D9D5C8; background: #FFFFFF; font-size: 14px; font-weight: 500; flex: none">HTML</button>
+<button style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #D9D5C8; background: #FFFFFF; font-size: 14px; font-weight: 500; flex: none">Notas</button>
+<button style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #D9D5C8; background: #FFFFFF; font-size: 14px; font-weight: 500; flex: none">Flow</button>
+<button style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #D9D5C8; background: #FFFFFF; font-size: 14px; font-weight: 500; flex: none">Web</button>
+</div>
+
+<button style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left; border-bottom: 1px solid #ECE9DE">
+<span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 12px; background: #F1EEE3; display: flex; align-items: center; justify-content: center; flex: none">
+<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6h7l2 3h9v10H3z"></path></svg>
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<span style="font-size: 15px; font-weight: 500; line-height: 20px">Proyectos</span>
+<span style="font-size: 13px; line-height: 18px; color: #56615C">Carpeta · entra para elegir dentro</span>
+</span>
+<svg aria-hidden="true" width="24" height="24" fill="none" stroke="#56615C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+</button>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1; min-height: 0; align-content: start">
+
+<button aria-label="Ejemplo interactivo, HTML. Elegido" aria-pressed="true" style="position: relative; display: flex; flex-direction: column; text-align: left; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 2px #176B5B; overflow: hidden">
+<span aria-hidden="true" style="height: 104px; background: #FFFFFF; border-bottom: 1px solid #ECE9DE; display: flex; flex-direction: column; gap: 6px; padding: 14px 14px 0; box-sizing: border-box">
+<span style="width: 70%; height: 8px; border-radius: 4px; background: #14201C"></span>
+<span style="width: 100%; height: 4px; border-radius: 2px; background: #C9C5B8"></span>
+<span style="width: 88%; height: 4px; border-radius: 2px; background: #C9C5B8"></span>
+<span style="width: 100%; height: 34px; border-radius: 8px; background: #E3F0EB; margin-top: 4px"></span>
+</span>
+<span style="padding: 10px 12px 12px; display: flex; flex-direction: column">
+<span style="font-size: 14px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Ejemplo interactivo</span>
+<span style="font-size: 12px; line-height: 16px; color: #56615C">HTML · 2 pines</span>
+</span>
+<span aria-hidden="true" style="position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; border-radius: 14px; background: #176B5B; display: flex; align-items: center; justify-content: center">
+<svg width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12.5l3.5 3.5L17 9"></path></svg>
+</span>
+</button>
+
+<button aria-label="Notas del ejemplo, Markdown. Elegido" aria-pressed="true" style="position: relative; display: flex; flex-direction: column; text-align: left; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 2px #176B5B; overflow: hidden">
+<span aria-hidden="true" style="height: 104px; background: #FFFFFF; border-bottom: 1px solid #ECE9DE; display: flex; flex-direction: column; gap: 8px; padding: 14px 14px 0; box-sizing: border-box">
+<span style="width: 60%; height: 8px; border-radius: 4px; background: #14201C"></span>
+<span style="width: 92%; height: 4px; border-radius: 2px; background: #C9C5B8"></span>
+<span style="width: 44%; height: 6px; border-radius: 3px; background: #14201C; margin-top: 4px"></span>
+<span style="width: 80%; height: 4px; border-radius: 2px; background: #C9C5B8; margin-left: 10px"></span>
+<span style="width: 70%; height: 4px; border-radius: 2px; background: #C9C5B8; margin-left: 10px"></span>
+</span>
+<span style="padding: 10px 12px 12px; display: flex; flex-direction: column">
+<span style="font-size: 14px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Notas del ejemplo</span>
+<span style="font-size: 12px; line-height: 16px; color: #56615C">Markdown</span>
+</span>
+<span aria-hidden="true" style="position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; border-radius: 14px; background: #176B5B; display: flex; align-items: center; justify-content: center">
+<svg width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12.5l3.5 3.5L17 9"></path></svg>
+</span>
+</button>
+
+<button disabled="" aria-label="Guía GitHub Sync, página web sin conexión. Ya está relacionada con este punto" style="position: relative; display: flex; flex-direction: column; text-align: left; border-radius: 18px; background: #F7F5EC; box-shadow: 0 0 0 1px #D9D5C8; overflow: hidden; cursor: default">
+<span aria-hidden="true" style="height: 104px; background: #F7F5EC; border-bottom: 1px solid #ECE9DE; display: flex; flex-direction: column; gap: 6px; padding: 14px 14px 0; box-sizing: border-box">
+<span style="width: 64%; height: 8px; border-radius: 4px; background: #8A877C"></span>
+<span style="width: 100%; height: 4px; border-radius: 2px; background: #C9C5B8"></span>
+<span style="width: 100%; height: 4px; border-radius: 2px; background: #C9C5B8"></span>
+<span style="width: 100%; height: 26px; border-radius: 8px; background: #E4E1D6; margin-top: 4px"></span>
+</span>
+<span style="padding: 10px 12px 12px; display: flex; flex-direction: column">
+<span style="font-size: 14px; font-weight: 600; line-height: 20px; color: #56615C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Guía GitHub Sync</span>
+<span style="font-size: 12px; line-height: 16px; color: #56615C">Ya relacionada</span>
+</span>
+</button>
+
+<button aria-label="Otro mapa, Flow. Sin elegir" aria-pressed="false" style="position: relative; display: flex; flex-direction: column; text-align: left; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #D9D5C8; overflow: hidden">
+<span aria-hidden="true" style="height: 104px; background: #14201C; display: block; position: relative">
+<svg width="170" height="104"><path d="M85 30L50 76M85 30l35 46" stroke="#89D5BC" stroke-width="2" fill="none"></path><circle cx="85" cy="30" r="10" fill="#E5B62F"></circle><circle cx="50" cy="76" r="7" fill="#89D5BC"></circle><circle cx="120" cy="76" r="7" fill="#89D5BC"></circle></svg>
+</span>
+<span style="padding: 10px 12px 12px; display: flex; flex-direction: column">
+<span style="font-size: 14px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Otro mapa</span>
+<span style="font-size: 12px; line-height: 16px; color: #56615C">Flow · 6 puntos</span>
+</span>
+<span aria-hidden="true" style="position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; box-sizing: border-box; border-radius: 14px; background: #FFFFFF; border: 2px solid #56615C"></span>
+</button>
+</div>
+
+<div style="flex: none; margin: 0 -16px; padding: 12px 16px 28px; background: #FFFFFF; border-top: 1px solid #D9D5C8; display: flex; align-items: center; gap: 12px">
+<span aria-hidden="true" style="display: flex; flex: none">
+<span style="width: 36px; height: 36px; box-sizing: border-box; border-radius: 10px; background: #E3F0EB; border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px #D9D5C8"></span>
+<span style="width: 36px; height: 36px; box-sizing: border-box; border-radius: 10px; background: #FBE7A1; border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px #D9D5C8; margin-left: -10px"></span>
+</span>
+<span style="flex: 1; min-width: 0; font-size: 14px; font-weight: 500; line-height: 20px">2 elegidos</span>
+<button style="height: 52px; padding: 0 24px; border-radius: 26px; background: #176B5B; color: #FFFFFF; font-size: 15px; font-weight: 600; flex: none">Relacionar 2</button>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
