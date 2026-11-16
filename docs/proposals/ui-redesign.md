@@ -1,6 +1,6 @@
 # Propuesta: rediseño de la app, Flow atrevido y selector de elementos
 
-Estado: **propuesta, sin autorización de implementación** (2026-11-16). No modifica la [especificación original](../../Interactive_Notes_Android_Agent_Design.md) ni cambia código. Amplía [Flow Dots](flow-dots.md); donde ambas difieren se indica qué habría que confirmar.
+Estado: **autorizada por el propietario el 2026-11-16 como trabajo nuevo previo a la aceptación de V1, con la instrucción expresa de no implementarla todavía.** Decisiones 1–4 resueltas (ver tabla final); 5–7 pendientes. No modifica la [especificación original](../../Interactive_Notes_Android_Agent_Design.md) ni cambia código. Amplía [Flow Dots](flow-dots.md); donde ambas difieren se indica qué habría que confirmar.
 
 ## Fuentes
 
@@ -158,14 +158,16 @@ Casos de prueba nuevos a registrar en `docs/testing.md` al implementar: `PICK-01
 - Conflicto de gestos: el arrastre del anillo radial frente al desplazamiento del canvas; el radial captura los gestos mientras está abierto.
 - Sin desenfoque real detrás de las hojas sobre contenido WebView (límite ya conocido); en Flow el velo es color sólido.
 
-## Decisiones que necesita el propietario
+## Decisiones del propietario
 
-| # | Decisión | Recomendación |
+Resueltas el 2026-11-16: 1–4. Pendientes: 5–7 (se muestra la recomendación).
+
+| # | Decisión | Resultado o recomendación |
 | --- | --- | --- |
-| 1 | Autorizar esta propuesta como trabajo nuevo antes de la aceptación de V1, y que sustituya la tarjeta provisional y parte de F2 de Flow Dots | Sí, por fases R0–R4 primero |
-| 2 | Qué se puede relacionar con un punto | Documentos y carpetas de la biblioteca; fotos y archivos sueltos quedan para F5 |
-| 3 | Punto con un solo elemento: ¿vista previa o abrir directo? | Vista previa; «Abrir documento» a un toque |
-| 4 | ¿El lienzo de Flow es siempre oscuro o sigue el tema del sistema? | Siempre oscuro: es su identidad |
+| 1 | Autorizar esta propuesta como trabajo nuevo antes de la aceptación de V1, y que sustituya la tarjeta provisional y parte de F2 de Flow Dots | **Autorizada; no implementar hasta nueva instrucción** |
+| 2 | Qué se puede relacionar con un punto | **Documentos y carpetas de la biblioteca, e imágenes desde el principio** (copia privada reescalada vía Photo Picker; requiere adelantar a R4 la tabla de adjuntos prevista en F5 y un tercer destino de relación). Otros archivos sueltos quedan fuera |
+| 3 | Punto con un solo elemento: ¿vista previa o abrir directo? | **Vista previa** |
+| 4 | ¿El lienzo de Flow es siempre oscuro o sigue el tema del sistema? | **Siempre oscuro** |
 | 5 | Al borrar un documento relacionado | La relación desaparece (cascada), sin marcas de «roto» |
 | 6 | Empaquetar Inter y Space Grotesk (OFL) en el APK | Sí; registrar licencias en `docs/dependencies.md` |
 | 7 | Menú radial con más de 6 elementos | 6 pétalos + «+N» y giro por páginas |
