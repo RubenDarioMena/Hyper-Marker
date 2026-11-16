@@ -15,9 +15,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
+const val MAX_FLOW_LINKS = 64
+
 class LibraryRepository(val context: Context, database: LibraryDatabase? = null) {
     val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
-        .addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3).build()
+        .addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4).build()
     val dao = this.database.dao()
     private val mutex = Mutex()
     private var recovered = false
@@ -196,6 +198,10 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
             dao.putFlowNodes(dao.flowNodes(doc.id).map { it.copy(id = nodes.getValue(it.id), documentId = next) })
             dao.putFlowEdges(dao.flowEdges(doc.id).filter { it.fromId in nodes && it.toId in nodes }
                 .map { it.copy(id = id(), documentId = next, fromId = nodes.getValue(it.fromId), toId = nodes.getValue(it.toId)) })
+            // Las fotos y adjuntos viajan con la copia del directorio; las relaciones apuntan a los mismos elementos.
+            val links = dao.flowLinks(doc.id).filter { it.nodeId in nodes }.associate { it.id to id() }
+            dao.putFlowLinks(dao.flowLinks(doc.id).filter { it.nodeId in nodes }.map { it.copy(id = links.getValue(it.id), documentId = next, nodeId = nodes.getValue(it.nodeId)) })
+            dao.putFlowNodes(dao.flowNodes(next).map { node -> node.copy(avatarLinkId = node.avatarLinkId?.let(links::get)) })
         }
         try {
             database.withTransaction {
@@ -318,7 +324,101 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         database.withTransaction {
             dao.put(value.copy(deletedAt = now, updatedAt = now))
             dao.putFlowEdges(dao.flowEdges(document).filter { it.fromId == node || it.toId == node }.map { it.copy(deletedAt = now, updatedAt = now) })
+            dao.putFlowLinks(dao.flowLinks(document).filter { it.nodeId == node }.map { it.copy(deletedAt = now, updatedAt = now) })
         }
+        flowFile(document, value.avatarPath)?.delete()
+    }
+
+    // ---- Fotos y relaciones de puntos (rediseño, Room v4) ----
+
+    /** Archivo privado dentro del Flow; rechaza rutas fuera de `avatars/` o `attachments/`. */
+    fun flowFile(document: String, relative: String?): File? {
+        if (relative == null) return null
+        require(relative.matches(Regex("(avatars|attachments)/[A-Za-z0-9-]{1,80}\\.webp"))) { "Ruta de imagen inválida" }
+        return PathGuard.resolve(directory(document), relative)
+    }
+    suspend fun markOpened(id: String) = write { dao.markOpened(id, System.currentTimeMillis()) }
+
+    /** Relaciona documentos y/o carpetas con un punto. Revive relaciones borradas en lugar de duplicarlas. */
+    suspend fun linkFlowNode(document: String, node: String, documents: List<String>, folders: List<String>): Int = write {
+        flowDocument(document); flowNode(document, node)
+        require(document !in documents) { "Un Flow no puede relacionarse consigo mismo" }
+        documents.forEach { require(dao.document(it) != null) { "El documento ya no existe" } }
+        folders.forEach { require(dao.folder(it) != null) { "La carpeta ya no existe" } }
+        val all = dao.allFlowLinks(document).filter { it.nodeId == node }
+        val active = all.filter { it.deletedAt == null }
+        val fresh = documents.distinct().filter { id -> active.none { it.targetDocumentId == id } }.map { it to true } +
+            folders.distinct().filter { id -> active.none { it.targetFolderId == id } }.map { it to false }
+        require(active.size + fresh.size <= MAX_FLOW_LINKS) { "Un punto admite hasta $MAX_FLOW_LINKS elementos relacionados" }
+        var position = (active.maxOfOrNull { it.position } ?: -1) + 1
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            fresh.forEach { (target, isDocument) ->
+                val old = all.firstOrNull { if (isDocument) it.targetDocumentId == target else it.targetFolderId == target }
+                dao.put(old?.copy(deletedAt = null, position = position++, updatedAt = now)
+                    ?: FlowNodeLink(id(), document, node, targetDocumentId = target.takeIf { isDocument }, targetFolderId = target.takeIf { !isDocument }, position = position++))
+            }
+        }
+        fresh.size
+    }
+
+    /** Copia privada reescalada de una imagen del selector del sistema como relación del punto. */
+    suspend fun linkFlowImage(document: String, node: String, uri: Uri, title: String?): FlowNodeLink {
+        val bitmap = withContext(Dispatchers.IO) { PrivateImages.fit(PrivateImages.decode(context, uri, PrivateImages.ATTACHMENT_SIDE, crop = false), PrivateImages.ATTACHMENT_SIDE) }
+        return write {
+            flowDocument(document); flowNode(document, node)
+            val active = dao.flowLinks(document).filter { it.nodeId == node }
+            require(active.size < MAX_FLOW_LINKS) { "Un punto admite hasta $MAX_FLOW_LINKS elementos relacionados" }
+            val link = FlowNodeLink(id(), document, node, imagePath = "attachments/${id()}.webp",
+                imageTitle = title?.trim()?.take(120)?.ifBlank { null } ?: "Imagen", position = (active.maxOfOrNull { it.position } ?: -1) + 1)
+            val file = requireNotNull(flowFile(document, link.imagePath))
+            try { PrivateImages.writeWebp(bitmap, file); dao.put(link); link } catch (error: Throwable) { file.delete(); throw error }
+        }
+    }
+
+    suspend fun unlinkFlowNode(document: String, link: String) = write {
+        val value = requireNotNull(dao.flowLinks(document).firstOrNull { it.id == link }) { "La relación ya no existe" }
+        val now = System.currentTimeMillis()
+        dao.put(value.copy(deletedAt = now, updatedAt = now))
+        // La imagen es una copia privada sólo de esta relación.
+        flowFile(document, value.imagePath)?.delete()
+    }
+
+    suspend fun reorderFlowLinks(document: String, node: String, ordered: List<String>) = write {
+        val links = dao.flowLinks(document).filter { it.nodeId == node }.associateBy { it.id }
+        require(ordered.toSet() == links.keys && ordered.size == links.size) { "La lista de relaciones cambió" }
+        val now = System.currentTimeMillis()
+        dao.putFlowLinks(ordered.mapIndexed { index, id -> links.getValue(id).copy(position = index, updatedAt = now) })
+    }
+
+    /** Foto desde el Photo Picker (`uri`) o desde una miniatura ya generada (`file`); se guarda recortada a 512 px. */
+    suspend fun setFlowAvatar(document: String, node: String, uri: Uri? = null, file: File? = null, linkId: String? = null, ring: Long? = null) {
+        require((uri == null) != (file == null)) { "Elige una sola imagen" }
+        val bitmap = withContext(Dispatchers.IO) {
+            val source = if (uri != null) PrivateImages.decode(context, uri, PrivateImages.AVATAR_SIDE, crop = true)
+                else requireNotNull(PrivateImages.decodeFile(requireNotNull(file), PrivateImages.AVATAR_SIDE)) { "La vista previa no está disponible" }
+            PrivateImages.square(source, PrivateImages.AVATAR_SIDE)
+        }
+        write {
+            val value = flowNode(document, node)
+            val path = "avatars/${id()}.webp"
+            val target = requireNotNull(flowFile(document, path))
+            try {
+                PrivateImages.writeWebp(bitmap, target)
+                dao.put(value.copy(avatarPath = path, avatarLinkId = linkId, ringColor = ring ?: value.ringColor, updatedAt = System.currentTimeMillis()))
+            } catch (error: Throwable) { target.delete(); throw error }
+            flowFile(document, value.avatarPath)?.delete()
+        }
+    }
+
+    suspend fun setFlowRing(document: String, node: String, ring: Long?) = write {
+        dao.put(flowNode(document, node).copy(ringColor = ring, updatedAt = System.currentTimeMillis()))
+    }
+
+    suspend fun clearFlowAvatar(document: String, node: String) = write {
+        val value = flowNode(document, node)
+        dao.put(value.copy(avatarPath = null, avatarLinkId = null, updatedAt = System.currentTimeMillis()))
+        flowFile(document, value.avatarPath)?.delete()
     }
     suspend fun installSample(): Document = withContext(Dispatchers.IO) {
         val next = id(); val operation = File(context.filesDir, "imports/$next").apply { mkdirs() }

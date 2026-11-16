@@ -7,10 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
 import com.hypermarker.browser.BrowserScreen
 import com.hypermarker.flow.FlowScreen
 import com.hypermarker.github.GitHubAddScreen
@@ -19,6 +17,7 @@ import com.hypermarker.library.LibraryScreen
 import com.hypermarker.library.LibraryViewModel
 import com.hypermarker.markdown.MarkdownScreen
 import com.hypermarker.viewer.ReaderScreen
+import com.hypermarker.ui.theme.HyperMarkerTheme
 
 class MainActivity : ComponentActivity() {
     private val model by viewModels<LibraryViewModel>()
@@ -27,22 +26,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) receive(intent)
         setContent {
-            val scheme = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFF89D5BC))
-                else lightColorScheme(primary = Color(0xFF176B5B), secondary = Color(0xFF667B69), background = Color(0xFFFFFDF7), surface = Color(0xFFFFFDF7))
-            MaterialTheme(colorScheme = scheme) {
+            HyperMarkerTheme {
                 val docs by model.documents.collectAsState()
                 val document = docs.firstOrNull { it.id == model.openedId }
+                LaunchedEffect(model.openedId) { model.openedId?.let(model::markOpened) }
                 Surface(color = MaterialTheme.colorScheme.background) {
                     when {
                         model.browserScreen -> BrowserScreen(model.repository, model.browserUrl, model.folderId,
-                            onClose = { model.browserScreen = false }, onSaved = { model.browserScreen = false; model.openedId = it })
+                            onClose = { model.browserScreen = false }, onSaved = { model.browserScreen = false; model.open(it) })
                         model.githubScreen -> GitHubAddScreen(model)
                         document?.type == "REMOTE_MARKDOWN" -> RemoteMarkdownScreen(document, model.repository,
-                            onClose = { model.openedId = null }, onCopy = { model.openedId = it })
-                        (document?.type == "HTML" || document?.type == "WEB_SNAPSHOT") -> ReaderScreen(requireNotNull(document), model.repository, onClose = { model.openedId = null }, onBrowse = model::browse,
-                            onMarkdown = { model.action { model.openedId = model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id } })
-                        document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = { model.openedId = null })
-                        document?.type == "FLOW" -> FlowScreen(document, model.repository, onClose = { model.openedId = null })
+                            onClose = model::closeDocument, onCopy = { model.open(it) })
+                        (document?.type == "HTML" || document?.type == "WEB_SNAPSHOT") -> ReaderScreen(requireNotNull(document), model.repository, onClose = model::closeDocument, onBrowse = model::browse,
+                            onMarkdown = { model.action { model.open(model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id) } })
+                        document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = model::closeDocument)
+                        document?.type == "FLOW" -> FlowScreen(document, model.repository, model.previews, onClose = model::closeDocument,
+                            onOpen = { id -> model.open(id, from = document.id) },
+                            onOpenFolder = { id -> model.openFolder(id, from = document.id) })
                         else -> LibraryScreen(model)
                     }
                 }

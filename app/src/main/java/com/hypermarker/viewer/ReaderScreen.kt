@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
@@ -110,7 +111,12 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
         val uri = Uri.parse(view.url)
         model.savePosition(view.scrollY, zoom, uri.encodedPath + (uri.encodedQuery?.let { "?$it" } ?: "") + (uri.encodedFragment?.let { "#$it" } ?: ""))
     } }
-    fun close() { model.finishDrawing(false); rememberPosition(); scope.launch { if (model.flush()) onClose() } }
+    fun close() {
+        model.finishDrawing(false); rememberPosition()
+        // Miniatura para Flow y el selector: sólo lo que el usuario ya vio, sin volver a ejecutar la página.
+        web?.let { runCatching { (context.applicationContext as com.hypermarker.HyperMarkerApplication).previews.captureView(document, it) } }
+        scope.launch { if (model.flush()) onClose() }
+    }
     fun dismissCross() { model.cross = null; web?.command("cancel") }
     fun changeMode(value: String) { model.finishDrawing(false); model.mode = value; model.pinArmed = false; model.reanchoringId = null; model.pendingAction = null; drawPanel = null; menu = false; model.cross = null; chrome = true }
     fun pickTarget(action: ReaderAction?) {
@@ -248,24 +254,32 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
             })
         }
         val insets = Modifier.windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+        AnimatedVisibility(chrome && !model.drawingActive && model.cross == null, Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
+            InkCircle(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", insets.padding(12.dp), onClick = ::close)
+        }
         AnimatedVisibility((chrome || model.drawingActive) && model.cross == null, Modifier.align(Alignment.TopEnd), enter = fadeIn(), exit = fadeOut()) {
-            Row(insets.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(insets.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (model.drawingActive) {
-                    IconButton(onClick = { model.finishDrawing(true); changeMode("VIEW") }) { Icon(Icons.Outlined.Check, "Confirmar dibujos", tint = Color(0xFF00C853)) }
-                    IconButton(onClick = { changeMode("VIEW") }) { Icon(Icons.Outlined.Close, "Cancelar dibujos", tint = Color(0xFFFF1744)) }
-                } else if (model.mode != "VIEW") {
-                    GlassButton(Icons.AutoMirrored.Outlined.Undo, "Deshacer", tones.first, enabled = model.canUndo, size = 44, onClick = model::undo)
-                    GlassButton(Icons.AutoMirrored.Outlined.Redo, "Rehacer", tones.first, enabled = model.canRedo, size = 44, onClick = model::redo)
+                    InkPill(Icons.Outlined.Check, "Confirmar", iconTint = Color(0xFF89D5BC)) { model.finishDrawing(true); changeMode("VIEW") }
+                    InkCircle(Icons.Outlined.Close, "Cancelar dibujos") { changeMode("VIEW") }
+                } else {
+                    if (model.mode != "VIEW") {
+                        InkCircle(Icons.AutoMirrored.Outlined.Undo, "Deshacer", enabled = model.canUndo, onClick = model::undo)
+                        InkCircle(Icons.AutoMirrored.Outlined.Redo, "Rehacer", enabled = model.canRedo, onClick = model::redo)
+                    } else InkPill(Icons.Outlined.PushPin, "Notas y cambios") { notes = true }
+                    InkCircle(Icons.Outlined.MoreHoriz, "Opciones del documento", selected = menu) { menu = !menu; drawPanel = null }
                 }
-                GlassButton(Icons.Outlined.MoreHoriz, "Opciones del documento", tones.first, selected = menu, size = 44) { menu = !menu; drawPanel = null }
             }
         }
         AnimatedVisibility(chrome && model.cross == null, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-            if (model.wheelsEnabled) ModeBar(model.mode, tones.second, web?.bridgeAvailable == true, ::changeMode, insets.padding(bottom = 16.dp))
-            else QuickBar(model.playing, model.pinArmed, model.mode == "DRAW", tones.second, web?.bridgeAvailable == true,
-                onAutoscroll = { val wasPlaying = model.playing; changeMode("VIEW"); model.playing = !wasPlaying; chrome = !model.playing },
-                onPin = { if (model.pinArmed) changeMode("VIEW") else { changeMode("EDIT"); model.pinArmed = true } },
-                onDraw = { changeMode(if (model.mode == "DRAW") "VIEW" else "DRAW"); model.tool = "pen" }, modifier = insets.padding(bottom = 16.dp))
+            Column(insets.padding(bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (model.mode == "VIEW" && model.wheelsEnabled && model.annotations.isEmpty()) ReaderNotice("Mantén presionado para las acciones rápidas", Modifier.padding(bottom = 10.dp))
+                if (model.wheelsEnabled) ModeBar(model.mode, tones.second, web?.bridgeAvailable == true, ::changeMode)
+                else QuickBar(model.playing, model.pinArmed, model.mode == "DRAW", tones.second, web?.bridgeAvailable == true,
+                    onAutoscroll = { val wasPlaying = model.playing; changeMode("VIEW"); model.playing = !wasPlaying; chrome = !model.playing },
+                    onPin = { if (model.pinArmed) changeMode("VIEW") else { changeMode("EDIT"); model.pinArmed = true } },
+                    onDraw = { changeMode(if (model.mode == "DRAW") "VIEW" else "DRAW"); model.tool = "pen" })
+            }
         }
         model.cross?.takeIf { model.wheelsEnabled && it.direct == null }?.let { request ->
             val actions = model.layout.getValue(request.mode)
@@ -276,8 +290,8 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                 onColor = { model.color = it; if (model.tool == "eraser") model.tool = "pen"; drawPanel = null },
                 onWidth = { model.width = it }, onTool = { model.tool = it; drawPanel = null }, onDismiss = { drawPanel = null })
         }
-        if (menu) MenuPanel(tones.first, onDismiss = { menu = false }) {
-            val tone = tones.first
+        if (menu) MenuPanel(GlassTone.LIGHT, onDismiss = { menu = false }) {
+            val tone = GlassTone.LIGHT
             Text(document.title, color = tone.content, style = MaterialTheme.typography.titleMedium, maxLines = 2, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
             MenuRow(Icons.Outlined.Gamepad, "Ruedas de acceso rápido", tone,
                 supporting = if (model.wheelsEnabled) "Mantener pulsado abre la cruceta" else "Accesos directos: Autoscroll, Pin y Dibujar",
@@ -324,8 +338,8 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                 color = tone.muted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
         }
         hint?.let { message ->
-            Text(message, color = tones.first.content, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).then(insets).padding(top = 72.dp, start = 24.dp, end = 24.dp)
-                .glass(RoundedCornerShape(50), tones.first, solid = true).padding(horizontal = 18.dp, vertical = 10.dp))
+            ReaderNotice(message, Modifier.align(Alignment.TopCenter).then(insets).padding(top = 72.dp, start = 24.dp, end = 24.dp),
+                accent = model.mode == "EDIT" || model.mode == "DRAW")
         }
     }
     swapAction?.let { action ->

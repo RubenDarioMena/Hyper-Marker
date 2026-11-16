@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.LightMode
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -193,33 +195,31 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         if (!toolsVisible) IconButton(onClick = ::touched, modifier = Modifier.align(Alignment.End), colors = icons) {
             Icon(Icons.Outlined.ExpandMore, "Mostrar herramientas")
         }
-        if (toolsVisible) Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (toolsVisible) Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { touched(); close() }, colors = icons) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Guardar y volver") }
             Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                Text(document.title, color = colors.content, maxLines = 1, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                Text(if (model.saved) "Guardado" else "Guardando…", color = colors.muted, fontSize = 12.sp)
+                Text(document.title, color = colors.content, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (model.saved) Icon(Icons.Outlined.Check, null, Modifier.size(14.dp), tint = colors.accent)
+                    Text(if (model.saved) "Guardado" else "Guardando…", Modifier.padding(start = 3.dp), color = colors.muted, fontSize = 12.sp)
+                }
             }
             IconButton(enabled = model.canUndo, colors = icons, onClick = { touched(); model.undo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Undo, "Deshacer") }
             IconButton(enabled = model.canRedo, colors = icons, onClick = { touched(); model.redo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Redo, "Rehacer") }
             IconButton(colors = icons, onClick = { touched(); dark = !dark; style.dark = dark }) { Icon(if (dark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode, if (dark) "Hoja clara" else "Hoja oscura") }
         }
-        if (toolsVisible) Row(Modifier.padding(horizontal = 16.dp, vertical = 2.dp).clip(RoundedCornerShape(50)).background(colors.selected).padding(3.dp)) {
-            listOf(false to "Fuente", true to "Visual").forEach { (visual, label) ->
+        if (toolsVisible) Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp).clip(RoundedCornerShape(50)).background(colors.selected).padding(4.dp)) {
+            listOf(true to "Visual", false to "Fuente").forEach { (visual, label) ->
                 val active = model.visual == visual
-                Text(label, color = if (active) colors.background else colors.content, fontSize = 14.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                Text(label, color = if (active) colors.background else colors.content, fontSize = 15.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(if (active) colors.content else colors.selected)
                         .clickable(role = Role.Tab) { touched(); if (visual) openVisual() else flushVisual { model.visual = false } }
                         .semantics { this.selected = active }
-                        .padding(horizontal = 18.dp, vertical = 7.dp))
+                        .padding(horizontal = 20.dp, vertical = 10.dp))
             }
         }
-        if (toolsVisible) {
-            MarkdownToolbar(colors, font, model.loaded && (!model.visual || webReady), onFont = { font = it; style.font = it }, onCommand = ::command,
-                onMenuExpandedChange = { toolbarMenuOpen = it })
-            HorizontalDivider(color = colors.divider)
-        }
         if (!model.visual) CompositionLocalProvider(LocalTextSelectionColors provides selection) {
-          Box(Modifier.fillMaxSize()) {
+          Box(Modifier.weight(1f).fillMaxWidth()) {
             if (field.text.isEmpty()) Text("# Una idea nueva\n\nEmpieza a escribir…", color = colors.muted, fontFamily = sheetFont(font), fontSize = 17.sp, lineHeight = 27.sp,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp))
             BasicTextField(state = field, enabled = model.loaded,
@@ -238,7 +238,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
           }
         } else key(visualGeneration) {
             val session = remember { UUID.randomUUID().toString() }
-            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
+            AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { context ->
                 webReady = false; initialized = false
                 WebView(context).apply {
                     visualWeb = this
@@ -290,6 +290,12 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                     loadUrl("$origin/editor/index.html")
                 }
             }, update = { it.setBackgroundColor(colors.background.toArgb()) }, onRelease = { it.stopLoading(); it.destroy(); if (visualWeb === it) visualWeb = null })
+        }
+        // Barra de formato abajo, sobre el teclado (pantalla 7).
+        if (toolsVisible) {
+            HorizontalDivider(color = colors.divider)
+            MarkdownToolbar(colors, font, model.loaded && (!model.visual || webReady), onFont = { font = it; style.font = it }, onCommand = ::command,
+                onMenuExpandedChange = { toolbarMenuOpen = it })
         }
     }
     linkFor?.let { edit -> LinkDialog(edit.selected.isNotEmpty(), onDismiss = { linkFor = null }) { url ->

@@ -17,9 +17,12 @@ La implementación inicial usa un módulo `app`, namespace/applicationId `com.hy
 | AndroidX WebKit | 1.14.0 | AssetLoader, mensajes con origen/frame y controles de service workers. Apache-2.0. |
 | DocumentFile | 1.0.1 | Acceso SAF a árboles. Apache-2.0. |
 | AndroidX WorkManager Runtime KTX | 2.12.0 | Un solo trabajo periódico para GitHub Sync; API mínima 24, compatible con la mínima 26 de la app. Apache-2.0. Dependencia nueva de esta rama, compilada en emulador Android 16. |
+| Inter (variable, `opsz,wght`) | Google Fonts, `ofl/inter`, SHA-256 `29160a80…59031` | Tipografía de cuerpo del rediseño (decisión 6). Empaquetada en `res/font/inter_variable.ttf`; pesos 400–700 con `FontVariation`. SIL OFL 1.1, texto en `assets/licenses/Inter-OFL.txt`. |
+| Space Grotesk (variable, `wght`) | Google Fonts, `ofl/spacegrotesk`, SHA-256 `acad6de1…f79f72` | Títulos del rediseño. `res/font/space_grotesk_variable.ttf`. SIL OFL 1.1, `assets/licenses/SpaceGrotesk-OFL.txt`. |
 | Apache Commons Compress | 1.28.0 | ZIP con atributos Unix, rechazo de symlinks y control de entradas. Apache-2.0 y avisos incluidos. |
 | Milkdown Crepe / kit / utils | 7.22.3 | Editor visual Markdown local basado en ProseMirror; `kit` aporta los comandos de formato usados por la barra superior. MIT; dependencias transitivas y textos completos en `assets/licenses/WEB.txt`. |
 | esbuild | 0.28.2 | Genera el bundle local del editor. MIT, herramienta de desarrollo. |
+| Compose UI Test JUnit4 / ui-test-manifest | BOM 2025.04.01 (1.8.0) | Sólo pruebas: capturas del rediseño con Robolectric en gráficos nativos (`RedesignScreenshotTest`). No entra en el APK release; `ui-test-manifest` sólo en debug. Apache-2.0. |
 | JUnit / Robolectric | 4.13.2 / 4.14.1 | Tests JVM y Room/JSON Android; EPL-1.0 / MIT, herramientas de prueba. |
 | AndroidX Test runner / ext / rules / UIAutomator | 1.6.2 / 1.2.1 / 1.6.1 / 2.3.0 | Instrumentación en emulador. Apache-2.0, herramientas de prueba. |
 | Playwright | 1.51.1 | Tests DOM/editor en Chrome aislado. Apache-2.0, herramienta de prueba. |

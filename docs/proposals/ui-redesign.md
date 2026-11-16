@@ -1,6 +1,6 @@
 # Propuesta: rediseño de la app, Flow atrevido y selector de elementos
 
-Estado: **autorizada por el propietario el 2026-11-16 como trabajo nuevo previo a la aceptación de V1, con la instrucción expresa de no implementarla todavía.** Decisiones 1–4 resueltas (ver tabla final); 5–7 pendientes. No modifica la [especificación original](../../Interactive_Notes_Android_Agent_Design.md) ni cambia código. Amplía [Flow Dots](flow-dots.md); donde ambas difieren se indica qué habría que confirmar.
+Estado: **autorizada por el propietario el 2026-11-16; implementación pedida el mismo día** («procede a la implementación»). Fases R0–R6 implementadas y la parte de accesibilidad de R7; la validación en dispositivo sigue pendiente (ver [progress.md](../../progress.md)). Decisiones 1–4 resueltas; en 5–7 se aplicó la recomendación, pendiente de confirmación del propietario. No modifica la [especificación original](../../Interactive_Notes_Android_Agent_Design.md) ni cambia código. Amplía [Flow Dots](flow-dots.md); donde ambas difieren se indica qué habría que confirmar.
 
 ## Fuentes
 
@@ -66,6 +66,8 @@ Transición: la foto se anima desde su posición en el canvas hasta su destino (
 Hoja con vista de cómo quedará en el lienzo y tres orígenes: galería (Photo Picker del sistema, sin permisos nuevos), la vista previa de un elemento relacionado, o sin foto. Color de anillo entre cinco opciones. La imagen se copia al directorio privado del Flow, reescalada a 512 px en WebP.
 
 ### Datos (Room v4, `MIGRATION_3_4`)
+
+> Implementado con un cambio respecto al bloque siguiente: por la decisión 2, `flow_node_links` tiene además `imagePath` e `imageTitle` (relación con una imagen privada copiada en `attachments/`).
 
 ```text
 flow_nodes        + avatarPath TEXT NULL      -- ruta relativa dentro del documento FLOW
@@ -160,14 +162,14 @@ Casos de prueba nuevos a registrar en `docs/testing.md` al implementar: `PICK-01
 
 ## Decisiones del propietario
 
-Resueltas el 2026-11-16: 1–4. Pendientes: 5–7 (se muestra la recomendación).
+Resueltas el 2026-11-16: 1–4. En 5–7 la implementación aplica la recomendación mostrada; el propietario puede cambiarla.
 
 | # | Decisión | Resultado o recomendación |
 | --- | --- | --- |
-| 1 | Autorizar esta propuesta como trabajo nuevo antes de la aceptación de V1, y que sustituya la tarjeta provisional y parte de F2 de Flow Dots | **Autorizada; no implementar hasta nueva instrucción** |
+| 1 | Autorizar esta propuesta como trabajo nuevo antes de la aceptación de V1, y que sustituya la tarjeta provisional y parte de F2 de Flow Dots | **Autorizada; implementación pedida el 2026-11-16** |
 | 2 | Qué se puede relacionar con un punto | **Documentos y carpetas de la biblioteca, e imágenes desde el principio** (copia privada reescalada vía Photo Picker; requiere adelantar a R4 la tabla de adjuntos prevista en F5 y un tercer destino de relación). Otros archivos sueltos quedan fuera |
 | 3 | Punto con un solo elemento: ¿vista previa o abrir directo? | **Vista previa** |
 | 4 | ¿El lienzo de Flow es siempre oscuro o sigue el tema del sistema? | **Siempre oscuro** |
-| 5 | Al borrar un documento relacionado | La relación desaparece (cascada), sin marcas de «roto» |
-| 6 | Empaquetar Inter y Space Grotesk (OFL) en el APK | Sí; registrar licencias en `docs/dependencies.md` |
-| 7 | Menú radial con más de 6 elementos | 6 pétalos + «+N» y giro por páginas |
+| 5 | Al borrar un documento relacionado | Aplicada: la relación desaparece (cascada), sin marcas de «roto» |
+| 6 | Empaquetar Inter y Space Grotesk (OFL) en el APK | Aplicada: fuentes variables en `res/font`, licencias en `docs/dependencies.md` y en la app |
+| 7 | Menú radial con más de 6 elementos | Aplicada: 6 pétalos + «+N» y giro por páginas |

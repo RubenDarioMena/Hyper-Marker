@@ -43,13 +43,32 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val hasGitHubToken get() = app.githubAuth.read() != null
     var folderId by mutableStateOf<String?>(null)
     var openedId by mutableStateOf<String?>(null)
+    val previews get() = app.previews
+    /** Pila corta de retorno: abrir un elemento desde un punto de Flow vuelve al Flow con Atrás. */
+    val returnStack = mutableStateListOf<String>()
+    fun open(id: String, from: String? = null) {
+        if (from == null) returnStack.clear() else if (returnStack.lastOrNull() != from) { returnStack.add(from); while (returnStack.size > 8) returnStack.removeAt(0) }
+        openedId = id
+    }
+    /** Abre una carpeta de la biblioteca desde un punto de Flow; Atrás vuelve al Flow. */
+    fun openFolder(id: String, from: String) { if (returnStack.lastOrNull() != from) returnStack.add(from); openedId = null; folderId = id }
+    fun closeDocument() {
+        val existing = documents.value.map { it.id }.toSet()
+        while (returnStack.isNotEmpty() && returnStack.last() !in existing) returnStack.removeAt(returnStack.lastIndex)
+        openedId = returnStack.removeLastOrNull()
+    }
+    fun markOpened(id: String) { viewModelScope.launch { runCatching { ready.await(); repository.markOpened(id) } } }
     var busy by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
     var pending by mutableStateOf<PendingImport?>(null)
     private var pendingParent: String? = null
     private val ready = CompletableDeferred<Unit>()
     private var job: Job? = null
-    init { viewModelScope.launch { try { repository.recover(); ready.complete(Unit) } catch (e: Exception) { error = e.message; ready.completeExceptionally(e) } } }
+    init { viewModelScope.launch {
+        try { repository.recover(); ready.complete(Unit) } catch (e: Exception) { error = e.message; ready.completeExceptionally(e); return@launch }
+        val existing = repository.dao.documents().map { it.id }.toSet()
+        withContext(Dispatchers.IO) { runCatching { app.previews.prune(existing) } }
+    } }
     fun action(block: suspend () -> Unit) {
         if (busy) return
         job = viewModelScope.launch {
@@ -61,7 +80,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     fun receive(uris: List<Uri>, tree: Boolean = false) = action {
-        openedId = null
+        openedId = null; returnStack.clear()
         require(pending == null) { "Elige una entrada o cancela la importación anterior" }
         pendingParent = folderId
         if (!tree && uris.size == 1 && repository.importer.displayName(uris.first()).endsWith(".md", true)) {
@@ -129,7 +148,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
     fun copyRemoteMarkdown(id: String) = action { openedId = repository.copyRemoteMarkdown(id).id }
     fun copyRemoteHtml(id: String) = action { openedId = repository.copyRemoteHtml(id).id }
-    fun deleteRetiredRemoteDocument(id: String) = action { repository.deleteRetiredRemoteDocument(id) }
+    fun deleteRetiredRemoteDocument(id: String) = action { repository.deleteRetiredRemoteDocument(id); app.previews.forget(id) }
+    val recentFolders by lazy { com.hypermarker.picker.RecentFolders(getApplication()) }
+    fun move(id: String, folder: Boolean, parent: String?) = action { repository.move(id, folder, parent); recentFolders.use(parent) }
+    fun delete(id: String, folder: Boolean) = action {
+        val before = repository.dao.documents().map { it.id }.toSet()
+        repository.delete(id, folder)
+        val after = repository.dao.documents().map { it.id }.toSet()
+        (before - after).forEach(app.previews::forget)
+    }
     fun enterFolder(id: String) {
         folderId = id
         viewModelScope.launch {

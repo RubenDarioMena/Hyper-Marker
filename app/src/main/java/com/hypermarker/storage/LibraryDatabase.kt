@@ -11,7 +11,9 @@ data class Folder(@PrimaryKey val id: String, val parentId: String?, val name: S
 @Entity(tableName = "documents", foreignKeys = [ForeignKey(entity = Folder::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE)], indices = [Index("folderId")])
 data class Document(@PrimaryKey val id: String, val folderId: String?, val title: String, val type: String,
     val entryPath: String? = null, val networkAllowed: Boolean = true, val revision: Int = 1,
-    val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis())
+    val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(),
+    /** Última apertura en esta app, para «Continuar». No cambia `updatedAt` ni la revisión. */
+    val lastOpenedAt: Long? = null)
 
 @Entity(tableName = "annotations", foreignKeys = [ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE)], indices = [Index("documentId")])
 data class Annotation(@PrimaryKey val id: String, val documentId: String, val kind: String,
@@ -24,7 +26,29 @@ data class ViewerPreference(@PrimaryKey val documentId: String, val zoom: Int = 
 /** Punto de un documento FLOW. Coordenadas de mundo en dp; `deletedAt` es tombstone para sincronización futura. */
 @Entity(tableName = "flow_nodes", foreignKeys = [ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE)], indices = [Index("documentId")])
 data class FlowNode(@PrimaryKey val id: String, val documentId: String, val title: String, val body: String, val x: Float, val y: Float,
-    val collapsed: Boolean = false, val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null)
+    val collapsed: Boolean = false, val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null,
+    /** Foto del punto: ruta relativa dentro del directorio privado del documento FLOW (`avatars/…webp`). */
+    val avatarPath: String? = null,
+    /** Relación cuya vista previa se copió como foto, si la foto vino de ahí. */
+    val avatarLinkId: String? = null,
+    /** Color ARGB del anillo de la foto. */
+    val ringColor: Long? = null)
+
+/**
+ * Relación de un punto con un elemento de la biblioteca: un documento, una carpeta o una imagen privada
+ * copiada dentro del Flow (`attachments/…webp`). Exactamente uno de los tres destinos está presente.
+ * Nunca apunta a rutas del sistema de archivos: no concede acceso a nada y no copia originales.
+ */
+@Entity(tableName = "flow_node_links", foreignKeys = [
+    ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE),
+    ForeignKey(entity = FlowNode::class, parentColumns = ["id"], childColumns = ["nodeId"], onDelete = ForeignKey.CASCADE),
+    ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["targetDocumentId"], onDelete = ForeignKey.CASCADE),
+    ForeignKey(entity = Folder::class, parentColumns = ["id"], childColumns = ["targetFolderId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("documentId"), Index("nodeId"), Index("targetDocumentId"), Index("targetFolderId"),
+        Index(value = ["nodeId", "targetDocumentId"], unique = true), Index(value = ["nodeId", "targetFolderId"], unique = true)])
+data class FlowNodeLink(@PrimaryKey val id: String, val documentId: String, val nodeId: String,
+    val targetDocumentId: String? = null, val targetFolderId: String? = null, val imagePath: String? = null, val imageTitle: String? = null,
+    val position: Int = 0, val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null)
 
 /** Conexión dirigida: `fromId` es el padre. */
 @Entity(tableName = "flow_edges", foreignKeys = [
@@ -75,6 +99,12 @@ interface LibraryDao {
     @Query("SELECT * FROM flow_edges WHERE documentId=:id AND deletedAt IS NULL ORDER BY createdAt, id") fun observeFlowEdges(id: String): Flow<List<FlowEdge>>
     @Query("SELECT * FROM flow_nodes WHERE documentId=:id AND deletedAt IS NULL") suspend fun flowNodes(id: String): List<FlowNode>
     @Query("SELECT * FROM flow_edges WHERE documentId=:id AND deletedAt IS NULL") suspend fun flowEdges(id: String): List<FlowEdge>
+    @Query("SELECT * FROM flow_node_links WHERE documentId=:id AND deletedAt IS NULL ORDER BY position, createdAt, id") fun observeFlowLinks(id: String): Flow<List<FlowNodeLink>>
+    @Query("SELECT * FROM flow_node_links WHERE documentId=:id") suspend fun allFlowLinks(id: String): List<FlowNodeLink>
+    @Query("SELECT * FROM flow_node_links WHERE documentId=:id AND deletedAt IS NULL ORDER BY position, createdAt, id") suspend fun flowLinks(id: String): List<FlowNodeLink>
+    @Upsert suspend fun put(link: FlowNodeLink)
+    @Upsert suspend fun putFlowLinks(values: List<FlowNodeLink>)
+    @Query("UPDATE documents SET lastOpenedAt=:at WHERE id=:id") suspend fun markOpened(id: String, at: Long)
     @Upsert suspend fun put(node: FlowNode)
     @Upsert suspend fun put(edge: FlowEdge)
     @Upsert suspend fun put(folder: RemoteFolder)
@@ -88,7 +118,7 @@ interface LibraryDao {
     @Query("DELETE FROM documents WHERE id=:id") suspend fun deleteDocument(id: String)
 }
 
-@Database(entities = [Folder::class, Document::class, Annotation::class, ViewerPreference::class, FlowNode::class, FlowEdge::class, RemoteFolder::class, RemoteEntry::class], version = 3, exportSchema = true)
+@Database(entities = [Folder::class, Document::class, Annotation::class, ViewerPreference::class, FlowNode::class, FlowEdge::class, RemoteFolder::class, RemoteEntry::class, FlowNodeLink::class], version = 4, exportSchema = true)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
     companion object {
@@ -111,6 +141,22 @@ abstract class LibraryDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `remote_entries` (`id` TEXT NOT NULL, `remoteFolderId` TEXT NOT NULL, `path` TEXT NOT NULL, `sha` TEXT NOT NULL, `size` INTEGER NOT NULL, `documentId` TEXT, `state` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`remoteFolderId`) REFERENCES `remote_folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_remote_entries_remoteFolderId` ON `remote_entries` (`remoteFolderId`)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_remote_entries_remoteFolderId_path` ON `remote_entries` (`remoteFolderId`, `path`)")
+            }
+        }
+        /** v3 → v4: fotos de puntos, relaciones de puntos y última apertura. Sólo añade; no reescribe filas. SQL del esquema 4.json. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `documents` ADD COLUMN `lastOpenedAt` INTEGER")
+                db.execSQL("ALTER TABLE `flow_nodes` ADD COLUMN `avatarPath` TEXT")
+                db.execSQL("ALTER TABLE `flow_nodes` ADD COLUMN `avatarLinkId` TEXT")
+                db.execSQL("ALTER TABLE `flow_nodes` ADD COLUMN `ringColor` INTEGER")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `flow_node_links` (`id` TEXT NOT NULL, `documentId` TEXT NOT NULL, `nodeId` TEXT NOT NULL, `targetDocumentId` TEXT, `targetFolderId` TEXT, `imagePath` TEXT, `imageTitle` TEXT, `position` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`documentId`) REFERENCES `documents`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`nodeId`) REFERENCES `flow_nodes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`targetDocumentId`) REFERENCES `documents`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`targetFolderId`) REFERENCES `folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_node_links_documentId` ON `flow_node_links` (`documentId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_node_links_nodeId` ON `flow_node_links` (`nodeId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_node_links_targetDocumentId` ON `flow_node_links` (`targetDocumentId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_flow_node_links_targetFolderId` ON `flow_node_links` (`targetFolderId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_flow_node_links_nodeId_targetDocumentId` ON `flow_node_links` (`nodeId`, `targetDocumentId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_flow_node_links_nodeId_targetFolderId` ON `flow_node_links` (`nodeId`, `targetFolderId`)")
             }
         }
     }

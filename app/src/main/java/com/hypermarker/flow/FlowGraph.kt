@@ -58,6 +58,18 @@ object FlowGraph {
         }.filterValues { it > 0 }
     }
 
+    /** Como [nearest], pero con un radio por elemento (los puntos con foto son más grandes). */
+    fun <T> nearestWithin(items: Iterable<T>, x: Float, y: Float, position: (T) -> Pair<Float, Float>, radius: (T) -> Float): T? {
+        var best: T? = null; var score = Float.MAX_VALUE
+        for (item in items) {
+            val (px, py) = position(item); val r = radius(item)
+            val d = (px - x) * (px - x) + (py - y) * (py - y)
+            // Normalizar por el radio: entre dos solapados gana aquel cuyo centro está relativamente más cerca.
+            if (d <= r * r && d / (r * r) < score) { best = item; score = d / (r * r) }
+        }
+        return best
+    }
+
     /** Punto más cercano a `(x, y)` dentro de `radius`, en coordenadas de mundo. */
     fun <T> nearest(items: Iterable<T>, x: Float, y: Float, radius: Float, position: (T) -> Pair<Float, Float>): T? {
         var best: T? = null; var distance = radius * radius

@@ -68,3 +68,10 @@ La [ampliación autorizada](proposals/web-browser.md) introduce un WebView remot
 Los archivos MHTML se convierten con límites, nombres generados y compensación; `Content-Location` no es una ruta de disco. El archivo original se conserva fuera de la raíz servida. `WEB_SNAPSHOT` aplica CSP sin scripts originales, frames, conexiones, formularios ni bases externas; `blockNetworkLoads` e intercepción offline se mantienen aun ante un `networkAllowed=true` inconsistente. El controlador nativo se instala por `evaluateJavascript`, con el mismo contrato de anotaciones existente. La captura no depende de caché HTTP ni de una sesión remota. Los límites de escritura temporal de Chromium están descritos en la propuesta.
 
 `ACTION_VIEW` sólo procesa URI de archivo/contenido. El importador restringe las rutas `file://` canónicas a `/storage/`; URI privados del sistema no se convierten en una lectura con los privilegios de la app. Los URI `content://` requieren la concesión del proveedor. No se añaden permisos Android de almacenamiento generales.
+
+## Rediseño: fotos, relaciones y miniaturas (2026-11-16)
+
+- Sin permisos nuevos. Las fotos y las imágenes relacionadas se eligen con el Photo Picker del sistema (`PickVisualMedia`, sólo `content://`), se decodifican reducidas con tope de píxeles y se guardan como copia WebP privada dentro del documento Flow. El original del usuario no se lee de nuevo ni se modifica.
+- Las relaciones son identificadores de la biblioteca (documento o carpeta) o una ruta privada validada (`avatars/` o `attachments/`, `PathGuard`). No conceden acceso al sistema de archivos ni a red. El selector sólo muestra la biblioteca.
+- Las miniaturas no ejecutan contenido: Markdown y Flow se dibujan como texto y geometría; HTML sólo usa la captura de lo que el usuario ya vio en el lector al cerrarlo. La vista previa del punto es una imagen; el contenido real sólo se abre con «Abrir», con las políticas del lector.
+- Las miniaturas viven en `cacheDir`; se borran al eliminar el documento y se podan las huérfanas al iniciar.

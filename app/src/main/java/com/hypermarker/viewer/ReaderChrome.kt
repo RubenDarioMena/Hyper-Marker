@@ -2,6 +2,7 @@ package com.hypermarker.viewer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -32,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,11 +68,12 @@ fun ReaderAction.icon(playing: Boolean = false): ImageVector = when (this) {
 
 fun toolIcon(tool: String): ImageVector = when (tool) { "highlighter" -> Icons.Outlined.BorderColor; "eraser" -> Icons.Outlined.AutoFixNormal; else -> Icons.Outlined.Create }
 
+/** Barra segmentada de tinta (pantalla 5): legible sobre cualquier página sin depender del muestreo. */
 @Composable
 fun ModeBar(mode: String, tone: GlassTone, annotationsEnabled: Boolean, onMode: (String) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    InkBar(modifier) {
         listOf(Triple("VIEW", "Ver", Icons.Outlined.Visibility), Triple("EDIT", "Editar", Icons.Outlined.Edit), Triple("DRAW", "Dibujar", Icons.Outlined.Draw)).forEach { (key, label, icon) ->
-            GlassButton(icon, "Modo $label", tone, label = label, selected = mode == key, enabled = key == "VIEW" || annotationsEnabled) { onMode(key) }
+            InkSegment(icon, label, "Modo $label", selected = mode == key, enabled = key == "VIEW" || annotationsEnabled) { onMode(key) }
         }
     }
 }
@@ -77,12 +81,64 @@ fun ModeBar(mode: String, tone: GlassTone, annotationsEnabled: Boolean, onMode: 
 @Composable
 fun QuickBar(playing: Boolean, pinArmed: Boolean, drawing: Boolean, tone: GlassTone, annotationsEnabled: Boolean,
              onAutoscroll: () -> Unit, onPin: () -> Unit, onDraw: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        GlassButton(ReaderAction.AUTOSCROLL.icon(playing), "Autoscroll", tone, label = "Autoscroll", selected = playing, onClick = onAutoscroll)
-        GlassButton(ReaderAction.PIN.icon(), "Poner pin: toca un elemento", tone, label = "Pin", selected = pinArmed, enabled = annotationsEnabled, onClick = onPin)
-        GlassButton(Icons.Outlined.Draw, "Dibujo básico", tone, label = "Dibujar", selected = drawing, enabled = annotationsEnabled, onClick = onDraw)
+    InkBar(modifier) {
+        InkSegment(ReaderAction.AUTOSCROLL.icon(playing), "Autoscroll", "Autoscroll", selected = playing, onClick = onAutoscroll)
+        InkSegment(ReaderAction.PIN.icon(), "Pin", "Poner pin: toca un elemento", selected = pinArmed, enabled = annotationsEnabled, onClick = onPin)
+        InkSegment(Icons.Outlined.Draw, "Dibujar", "Dibujo básico", selected = drawing, enabled = annotationsEnabled, onClick = onDraw)
     }
 }
+
+/** Contenedor en píldora de tinta para los segmentos del lector. */
+@Composable
+fun InkBar(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    Row(modifier.clip(RoundedCornerShape(50)).background(INK).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically, content = content)
+}
+
+@Composable
+fun InkSegment(icon: ImageVector, label: String, description: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(50)).background(if (selected) PAPER else Color.Transparent)
+        .clickable(enabled = enabled, role = Role.Tab, onClick = onClick)
+        .semantics { contentDescription = description; this.selected = selected }
+        .alpha(if (enabled) 1f else .45f).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(20.dp), tint = if (selected) INK else PAPER)
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = if (selected) INK else PAPER, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
+    }
+}
+
+/** Botón redondo de tinta del cromo del lector. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun InkCircle(icon: ImageVector, description: String, modifier: Modifier = Modifier, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
+    Box(modifier.size(48.dp).clip(CircleShape).background(if (selected) PAPER else INK).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+        .semantics { contentDescription = description; this.selected = selected }.alpha(if (enabled) 1f else .45f), contentAlignment = Alignment.Center) {
+        Icon(icon, null, Modifier.size(22.dp), tint = if (selected) INK else PAPER)
+    }
+}
+
+/** Píldora de tinta con icono y texto («Notas y cambios»). */
+@Composable
+fun InkPill(icon: ImageVector, label: String, iconTint: Color = PIN, onClick: () -> Unit) {
+    Row(Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(50)).background(INK).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(20.dp), tint = iconTint)
+        Text(label, Modifier.padding(start = 8.dp), color = PAPER, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** Aviso en píldora: claro con borde (consejos) o acento (selección activa). */
+@Composable
+fun ReaderNotice(text: String, modifier: Modifier = Modifier, accent: Boolean = false) {
+    Text(text, modifier.clip(RoundedCornerShape(50)).background(if (accent) ACCENT else PAPER).border(1.dp, if (accent) ACCENT else BORDER, RoundedCornerShape(50))
+        .padding(horizontal = 16.dp, vertical = 9.dp), color = if (accent) Color.White else INK, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+}
+
+internal val INK = Color(0xFF14201C)
+internal val PAPER = Color(0xFFFFFDF7)
+internal val PIN = Color(0xFFE5B62F)
+internal val ACCENT = Color(0xFF176B5B)
+internal val BORDER = Color(0xFFD9D5C8)
 
 /** Cruceta: cuatro acciones alrededor del punto mantenido. Mantener una opción permite reasignarla. */
 @Composable
@@ -92,7 +148,7 @@ fun CrossMenu(request: CrossRequest, actions: List<ReaderAction>, tone: GlassTon
         val radius = 78.dp; val item = 72.dp; val reach = radius + item / 2 + 4.dp
         val cx = with(density) { request.x.toDp() }.coerceIn(reach, (maxWidth - reach).coerceAtLeast(reach))
         val cy = with(density) { request.y.toDp() }.coerceIn(reach, (maxHeight - reach).coerceAtLeast(reach))
-        Box(Modifier.offset(cx - 7.dp, cy - 7.dp).size(14.dp).glass(CircleShape, tone, selected = true))
+        Box(Modifier.offset(cx - 8.dp, cy - 8.dp).size(16.dp).clip(CircleShape).background(Color.White).border(2.dp, INK, CircleShape))
         val directions = listOf(0 to -1, 1 to 0, 0 to 1, -1 to 0)
         actions.forEachIndexed { slot, action ->
             val (dx, dy) = directions[slot]
@@ -106,14 +162,16 @@ fun CrossMenu(request: CrossRequest, actions: List<ReaderAction>, tone: GlassTon
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CrossItem(action: ReaderAction, tone: GlassTone, enabled: Boolean, playing: Boolean, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
-    Column(modifier.glass(RoundedCornerShape(24.dp), tone)
+    // Tarjetas sólidas (pantalla 6); la acción Pin destaca en amarillo.
+    val pin = action == ReaderAction.PIN
+    Column(modifier.shadow(6.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp)).background(if (pin) PIN else Color.White)
         .combinedClickable(role = Role.Button, onLongClick = onLongClick, onClickLabel = action.label, onClick = onClick)
         .semantics { contentDescription = action.label + if (enabled) "" else " (no disponible)" }
         .alpha(if (enabled) 1f else .42f).padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Icon(action.icon(playing), null, tint = tone.content, modifier = Modifier.size(24.dp))
+        Icon(action.icon(playing), null, tint = INK, modifier = Modifier.size(24.dp))
         Spacer(Modifier.height(4.dp))
-        Text(action.label, color = tone.content, fontSize = 10.sp, lineHeight = 11.sp, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium, style = TextStyle(shadow = tone.halo))
+        Text(action.label, color = INK, fontSize = 11.sp, lineHeight = 12.sp, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
     }
 }
 

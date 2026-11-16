@@ -10,6 +10,7 @@ class HyperMarkerApplication : Application() {
         super.onCreate()
     }
     val repository by lazy { LibraryRepository(this) }
+    val previews by lazy { com.hypermarker.preview.PreviewStore(repository) }
     val githubAuth by lazy { GitHubAuthStore(this) }
     val githubResourceSettings by lazy { ResourceSettings(this) }
     val githubGovernor by lazy { ResourceGovernor(PreferencesResourceStore(this), limits = githubResourceSettings.load()) }

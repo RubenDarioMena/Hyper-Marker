@@ -95,6 +95,32 @@ Funcionalidad fuera de V1 ([propuesta](proposals/flow-dots.md)). Estos casos no 
 | FLOW-07 | Desplazar con un dedo, zoom con dos, Encuadrar. | El zoom mantiene el punto bajo los dedos; Encuadrar muestra todos los puntos visibles. |
 | FLOW-08 | Abrir una base v1 con datos y actualizar a v2. | La migración conserva documentos y anotaciones y Room valida el esquema. |
 
+## Rediseño: selector, Flow atrevido y miniaturas (2026-11-16)
+
+Casos de la [propuesta](proposals/ui-redesign.md). «JVM» indica cobertura automatizada en `testDebugUnitTest`; el resto requiere dispositivo.
+
+| ID | Pasos | Resultado esperado | Cobertura |
+| --- | --- | --- | --- |
+| PICK-01 | Mover una carpeta: intentar elegirse a sí misma, una descendiente, una carpeta GitHub y su carpeta actual. | Se ven pero no se pueden elegir; cada una explica el motivo; el botón nombra el destino. | JVM `ItemPickerStateTest` |
+| PICK-02 | Buscar en el selector; entrar en carpetas y volver por las migas. | La búsqueda recorre toda la biblioteca; las migas siguen la navegación. | JVM |
+| PICK-03 | Mover varias veces a carpetas distintas. | «Usadas hace poco» muestra las 4 últimas válidas, sin repetir. | JVM (lógica) + dispositivo |
+| PICK-04 | Crear una carpeta desde el selector y mover a ella. | La carpeta se crea dentro de la ubicación actual y aparece al instante. | Dispositivo |
+| PICK-05 | Relacionar: elegir varios documentos y una carpeta. | Contador y botón «Relacionar N»; se crean N relaciones. | JVM |
+| PICK-06 | Relacionar elementos ya relacionados o el propio Flow. | Aparecen como «Ya relacionada» / «Es este mismo Flow» y no se seleccionan. | JVM |
+| FLOW-09 | Foto del punto desde la galería y desde una vista previa; cambiar anillo; quitar foto. | Photo Picker sin permisos; copia WebP 512 px privada; el punto crece con anillo; quitar borra la copia. | Dispositivo (rutas privadas: JVM) |
+| FLOW-10 | Tocar un punto con 1 relación; Abrir; Atrás. | Tarjeta con vista previa como imagen; «Abrir» abre el documento; Atrás vuelve al Flow. | Dispositivo; captura `10-flow-punto-abierto` |
+| FLOW-11 | Punto con 2, 6 y 7+ relaciones: tocar pétalos, «+N», girar el anillo, «Ver los N». | Hasta 6 pétalos; «+N» y el giro pasan de página; la lista muestra todos. | JVM `RadialLayoutTest`; captura `11-flow-radial` |
+| FLOW-12 | Borrar el documento o carpeta relacionados. | La relación desaparece sin marcas de «roto» (decisión 5). | JVM `FlowLinksTest` |
+| FLOW-13 | Duplicar un Flow con fotos y relaciones. | Copia con ids nuevos, mismas relaciones y archivos privados copiados. | JVM |
+| FLOW-14 | Abrir una carpeta desde un punto; Atrás. | La biblioteca muestra la carpeta; Atrás regresa al Flow. | Dispositivo |
+| FLOW-15 | Abrir una base v3 con datos. | Migración 3 → 4 sin pérdida; Room valida el esquema exportado `4.json`. | JVM |
+| PREV-01 | Nota Markdown y Flow en el selector. | Miniaturas dibujadas sin WebView; se regeneran al cambiar revisión o grafo. | JVM (texto/firma) + captura |
+| PREV-02 | Abrir y cerrar un HTML; verlo en el selector. | La miniatura es la captura de lo que se vio al cerrar; nunca se ejecuta la página para generarla. | Dispositivo |
+| PREV-03 | HTML nunca abierto. | Se muestra el dibujo del tipo, sin render fuera de pantalla. | Dispositivo |
+| PREV-04 | Borrar un documento. | Sus miniaturas se eliminan; al iniciar se podan las huérfanas. | Dispositivo |
+
+Capturas automáticas: `./gradlew testDebugUnitTest --tests com.hypermarker.RedesignScreenshotTest` escribe PNG en `app/build/screenshots/` (Robolectric, gráficos nativos, 390×844 dp). No ejecuta WebView: el lector (pantallas 5–6) no tiene captura automática.
+
 ## Comandos previstos
 
 Tareas disponibles desde la raíz (JDK 17 y SDK configurados):

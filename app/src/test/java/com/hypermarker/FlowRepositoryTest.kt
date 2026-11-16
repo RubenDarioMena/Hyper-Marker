@@ -93,7 +93,7 @@ class FlowRepositoryTest {
             db.execSQL("INSERT INTO documents (id, folderId, title, type, entryPath, networkAllowed, revision, createdAt, updatedAt) VALUES ('11111111-1111-1111-1111-111111111111', NULL, 'Antigua', 'MARKDOWN', NULL, 0, 1, 0, 0)")
             db.version = 1
         }
-        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3).build()
+        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4).build()
         repo = LibraryRepository(context, database)
         assertEquals("Antigua", repo.dao.documents().single().title)
         val flow = repo.createFlow(null, "Después de migrar")
@@ -121,7 +121,7 @@ class FlowRepositoryTest {
             db.execSQL("INSERT INTO annotations (id, documentId, kind, pageKey, payload, schemaVersion) VALUES ('a1', '11111111-1111-1111-1111-111111111111', 'PIN', '/', '{}', 1)")
             db.version = 2
         }
-        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_2_3).build()
+        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4).build()
         repo = LibraryRepository(context, database)
         assertEquals("Punto", repo.dao.flowNodes("11111111-1111-1111-1111-111111111111").single().title)
         assertEquals(1, repo.dao.annotations("11111111-1111-1111-1111-111111111111").size)

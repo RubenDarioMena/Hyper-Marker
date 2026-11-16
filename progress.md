@@ -194,3 +194,24 @@ Siguiente paso concreto:
 - Siguiente paso concreto: el propietario revisa el lienzo y responde las decisiones 1–7. Con autorización, empezar por R0 (tema y componentes) y R1 (selector en modo Destino, sustituye «Mover a…»).
 - **Actualización del mismo día:** el propietario autorizó la propuesta pero indicó **no implementarla aún**. Resueltas: relacionar documentos, carpetas e imágenes desde el principio; lienzo de Flow siempre oscuro; vista previa con un solo elemento. Pendientes las decisiones 5–7. El modelo de datos de la propuesta aún no refleja el destino «imagen» de una relación; ajustarlo antes de R3/R4. El HTML del diseño y las maquetas no están en Git (sólo en el lienzo privado).
 - Documentos de diseño versionados en `docs/design/` por pedido del propietario: su HTML (pantallas 1–8) y las fuentes de las pantallas 9–14, que sólo se renderizan dentro del lienzo.
+
+## Implementación del rediseño (2026-11-16)
+
+- Encargo: «revisa `ui-redesign.md` y las propuestas en `docs/design/` y procede a la implementación». Rama `claude/relaxed-brahmagupta-eop7d6`, base `e59e3d2`. Especificación original intacta.
+- **Implementado (R0–R6 y accesibilidad de R7)**, detalle en [architecture.md](architecture.md#rediseño-de-la-app-2026-11-16):
+  - R0: tema de tokens (`ui/theme`), Inter y Space Grotesk variables (OFL) empaquetadas, componentes compartidos (`ui/Components.kt`, `ui/Kinds.kt`).
+  - R1: selector de elementos (`picker/`) en modos Destino, Relacionar y Lista. Sustituye «Mover a…» y elige destino en «Guardar copia» del navegador; recientes, migas, búsqueda global, crear carpeta, exclusiones explicadas.
+  - R2: `PreviewStore` (Markdown y Flow dibujados; HTML/Web por captura al cerrar el lector; carpeta e imagen). Sin render fuera de pantalla de HTML nunca abiertos (se muestra el dibujo del tipo).
+  - R3–R4: Room v4 (`MIGRATION_3_4`, esquema `4.json`), lienzo de tinta, puntos con foto, anillo y contador, hoja «Foto del punto», punto abierto con vista previa y transición, menú radial con páginas y giro, relaciones con documentos, carpetas e **imágenes** (decisión 2), visor de imágenes, pila de retorno al Flow.
+  - R5: biblioteca (búsqueda/web en un campo, chips, «Continuar» con `lastOpenedAt`, filas con baldosa, botón «Nuevo»), hoja «Nuevo», hoja de acciones y Ajustes (GitHub, licencias).
+  - R6: piel del lector (barra segmentada de tinta, «Notas y cambios», cruceta en tarjetas con Pin amarillo, avisos en píldora, botón Volver), Markdown (cabecera con «Guardado», Visual/Fuente, barra de formato abajo con «+»), navegador (barra inferior) y asistente de GitHub en 4 pasos. Sin cambios de gesto, protocolo ni políticas.
+  - R7 (parcial): nodos semánticos por punto visible con acciones personalizadas (editar, conectar, relacionar, foto, plegar, lista) y «Ver los N» como alternativa al radial.
+- Decisiones 5–7: aplicada la recomendación (cascada sin marcas, fuentes empaquetadas, 6 pétalos + «+N»); pendientes de confirmación del propietario.
+- Validación (entorno de esta sesión: contenedor Linux sin KVM, OpenJDK 21, Android SDK 36 / build-tools 36.0.0 instalados con `sdkmanager`; Maven Central devolvió 429 de forma intermitente y se reintentó):
+  - `./gradlew testDebugUnitTest` **84/84 PASS** (nuevos: `ItemPickerStateTest`, `RadialLayoutTest`, `FlowLinksTest` con migración v3→v4, `RedesignScreenshotTest`; existentes actualizados para migrar hasta v4).
+  - `lintDebug` 0 errores, 65 advertencias (actualizaciones de dependencias y sugerencias KTX/estilo).
+  - `assembleDebug` y `assembleDebugAndroidTest` PASS. APK local `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `099ec5bb576630548b34be342a201f50cc4270228a3119104944078325aebb77`; **no versionado ni publicado** en `downloads/`.
+  - Capturas renderizadas por Compose (Robolectric, gráficos nativos, 390×844 dp) en [docs/design/capturas-implementacion/](docs/design/capturas-implementacion/): pantallas 1–4, 7 y 9–14 revisadas contra las maquetas.
+- **No verificado**: ninguna prueba instrumentada ni táctil (sin emulador ni dispositivo). Pendiente en dispositivo: gestos del lienzo con fotos, transición del punto abierto, giro del anillo, Photo Picker real, captura de miniatura HTML al cerrar el lector, lector (pantallas 5–6) sin captura automática porque Robolectric no ejecuta WebView, TalkBack, rendimiento con muchas fotos y `AppWorkflowTest` (se conservaron las descripciones que usa).
+- **Precaución**: instalar este APK migra la base a v4. En S24/Tab respaldar antes con `run-as`, como en v2 y v3.
+- Siguiente paso concreto: instalar el APK en el S24 tras respaldo, recorrer PICK-01…06, FLOW-09…15 y PREV-01…04 de [docs/testing.md](docs/testing.md), ejecutar la suite instrumentada en emulador y registrar resultados; confirmar o cambiar las decisiones 5–7.
