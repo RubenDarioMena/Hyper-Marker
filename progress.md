@@ -249,3 +249,9 @@ Siguiente paso concreto:
 - **Precaución**: este APK migra la base a Room v4 (`MIGRATION_3_4`). Respaldar con `run-as` antes de instalar en cada dispositivo.
 - No verificado: UI combinada de Markdown en dispositivo (cabecera flotante + barra inferior con teclado), pruebas instrumentadas.
 - Siguiente paso concreto: conectar los dispositivos, respaldar datos, `adb install -r` y recorrer UX-01…06, PICK-01…06, FLOW-09…15 y PREV-01…04 de `docs/testing.md`.
+
+## Actualización de Samsung Tab SM-P613 con rediseño + legibilidad (2026-11-16)
+
+- ADB detectó `R52X300Y59W` (Android 14). Respaldo previo en `artifacts/phone-backup/tab-redesign-main-20261116-003722/`: APK instalado (`previous.apk`, SHA-256 `8354a5ed…e520`, firma `42909c43…`) y `app-data.tar.gz` (`databases files no_backup shared_prefs`); `gzip -t` PASS, 33 entradas, SQLite `integrity_check = ok`, **user_version 4** (la base ya había migrado con una compilación del rediseño instalada a las 00:16), 5 documentos.
+- El primer `adb install -r` se interrumpió por desconexión USB; según `lastUpdateTime` (00:38:16) llegó a aplicarse. Tras reiniciar el servidor ADB se reinstaló: **Success** (00:39:32). El APK instalado coincide con `artifacts/Hyper-Marker-redesign-main-debug.apk` (SHA-256 `4f6fe339…a74b`). `MainActivity` arranque COLD, Status ok, 3,36 s, proceso activo y en primer plano, 5 carpetas en `files/documents`, sin entradas en el buffer de fallos. Sin pruebas instrumentadas ni recorrido manual.
+- S24 Ultra (`R5CX732ZD2K`) no detectado: **pendiente** respaldo e instalación.
