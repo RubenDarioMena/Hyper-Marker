@@ -151,3 +151,37 @@ test('export geometry includes whole drawings outside the viewport and falls bac
  const missing=await p.evaluate(()=>HyperMarker.exportDrawing(['one']));assert.equal(missing.context,false);assert.deepEqual(missing.paths[0].points,payload.points);
  await p.close();
 });
+test('form fields are buffered through the bridge and restored after a reload, including late fields',async()=>{
+ const p=await browser.newPage({viewport:{width:600,height:700}});
+ const html=`<form id="f"><input id="name" name="name"><textarea id="notes"></textarea><input id="pass" type="password"><select id="pick"><option value="a">A</option><option value="b">B</option></select>
+  <input type="radio" name="r" id="r1" value="1" checked><input type="radio" name="r" id="r2" value="2"><input type="checkbox" id="ok"></form><div id="rich" contenteditable="true"></div>`;
+ await p.setContent(html);
+ await p.evaluate(()=>{window.events=[];window.HyperMarkerBridge={postMessage:value=>window.events.push(JSON.parse(value))};});
+ const controller=await readFile('../app/src/main/assets/annotation/controller.js','utf8');
+ await p.addScriptTag({content:controller});await p.evaluate(()=>HyperMarker.init({sessionId:'s',documentId:'d',revision:1}));
+ await p.fill('#name','Ana');await p.fill('#notes','Feedback importante\nsegunda línea');await p.fill('#pass','secreto');
+ await p.selectOption('#pick','b');await p.check('#r2');await p.check('#ok');await p.locator('#rich').click();await p.keyboard.type('Nota rica');
+ await p.waitForTimeout(600);
+ const state=await last(p,'form.state');
+ const fields=state.payload.fields;
+ assert.ok(fields.length>=6);
+ assert.ok(!JSON.stringify(fields).includes('secreto'),'passwords are never buffered');
+ const byKey=Object.fromEntries(fields.map(f=>[f.k,f]));
+ assert.equal(byKey['#name'].v,'Ana');assert.equal(byKey['#notes'].v,'Feedback importante\nsegunda línea');assert.equal(byKey['#pick'].v,'b');
+ assert.equal(byKey['#r1'].c,false);assert.equal(byKey['#r2'].c,true);assert.equal(byKey['#ok'].c,true);assert.match(byKey['#rich'].h,/Nota rica/);
+ // Recarga simulada: DOM nuevo y vacío; el formulario de notas aparece más tarde.
+ await p.setContent(html.replace('<textarea id="notes"></textarea>',''));
+ await p.evaluate(()=>{window.events=[];window.HyperMarkerBridge={postMessage:value=>window.events.push(JSON.parse(value))};});
+ await p.addScriptTag({content:controller});await p.evaluate(()=>HyperMarker.init({sessionId:'s2',documentId:'d',revision:1}));
+ await p.evaluate(fields=>{window.changes=0;document.addEventListener('input',()=>changes++);HyperMarker.command('form.restore',{fields});},fields);
+ assert.equal(await p.inputValue('#name'),'Ana');assert.equal(await p.inputValue('#pick'),'b');
+ assert.equal(await p.isChecked('#r2'),true);assert.equal(await p.isChecked('#r1'),false);assert.equal(await p.isChecked('#ok'),true);
+ assert.equal(await p.inputValue('#pass'),'');assert.match(await p.locator('#rich').textContent(),/Nota rica/);
+ assert.ok(await p.evaluate(()=>changes)>0,'restored values notify page scripts');
+ await p.fill('#name','Ana María');await p.waitForTimeout(600);
+ assert.ok((await last(p,'form.state')).payload.fields.some(f=>f.k==='#notes'),'unresolved fields are kept in the buffer');
+ await p.evaluate(()=>{const t=document.createElement('textarea');t.id='notes';document.getElementById('f').append(t);});
+ await p.waitForTimeout(900);
+ assert.equal(await p.inputValue('#notes'),'Feedback importante\nsegunda línea');
+ await p.close();
+});

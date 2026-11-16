@@ -10,6 +10,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -33,7 +34,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -89,6 +92,11 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
     var lastInteraction by remember { mutableIntStateOf(0) }
     var toolbarMenuOpen by remember { mutableStateOf(false) }
     var fingerDown by remember { mutableStateOf(false) }
+    var headerHeight by remember { mutableStateOf(0.dp) }
+    var visualProtection by remember { mutableStateOf<MarkdownProtection.Protected?>(null) }
+    var protectedHint by remember { mutableStateOf<String?>(null) }
+    val density = LocalDensity.current
+    LaunchedEffect(protectedHint) { if (protectedHint != null) { delay(4_500); protectedHint = null } }
     val touchExploration = remember(context) {
         (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager).isTouchExplorationEnabled
     }
@@ -133,7 +141,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         if (model.visual && webReady && editor != null) editor.evaluateJavascript("window.editorSnapshot?.()") { value ->
             runCatching {
                 val snapshot = JSONObject(org.json.JSONTokener(value).nextValue() as String)
-                val source = snapshot.getString("source")
+                val source = MarkdownProtection.restore(snapshot.getString("source"), visualProtection)
                 val fraction = snapshot.optDouble("fraction", 0.0).toFloat().coerceIn(0f, 1f)
                 field.edit {
                     replace(0, length, source)
@@ -167,12 +175,14 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
     }
     fun openVisual() {
         if (model.visual) return
-        if (model.unsupported()) warning = true
+        val protection = MarkdownProtection.protect(model.source)
+        if (protection == null) warning = true
         else if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) model.error = "Actualiza Android System WebView para utilizar el editor visual."
         else {
             visualScrollFraction = sourcePositionFromVisual ?: if (sourceScroll.maxValue > 0) sourceScroll.value.toFloat() / sourceScroll.maxValue
                 else if (model.source.isNotEmpty()) field.selection.end.toFloat() / model.source.length else 0f
             sourcePositionFromVisual = null
+            if (protection.count > 0) protectedHint = "${protection.count} fragmento(s) con imágenes, HTML o tablas especiales se muestran como fuente protegida; el resto es editable en Visual."
             model.visual = true
         }
     }
@@ -182,6 +192,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer); model.saveSoon() }
     }
     LaunchedEffect(dark, font, webReady) { if (webReady) applyStyle() }
+    LaunchedEffect(headerHeight, webReady) { if (webReady) visualWeb?.evaluateJavascript(topInsetScript(headerHeight.value), null) }
     val activity = LocalActivity.current
     DisposableEffect(dark) {
         val bars = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
@@ -192,10 +203,12 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
     val selection = TextSelectionColors(handleColor = colors.content, backgroundColor = colors.content.copy(alpha = .22f))
     Column(Modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).imePadding()) {
         val icons = IconButtonDefaults.iconButtonColors(contentColor = colors.content, disabledContentColor = colors.muted.copy(alpha = .5f))
-        if (!toolsVisible) IconButton(onClick = ::touched, modifier = Modifier.align(Alignment.End), colors = icons) {
-            Icon(Icons.Outlined.ExpandMore, "Mostrar herramientas")
-        }
-        if (toolsVisible) Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // La cabecera flota sobre la hoja: mostrarla u ocultarla nunca desplaza el texto.
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val sheetHeight = maxHeight
+        val tools: @Composable () -> Unit = { Column(Modifier.fillMaxWidth().background(colors.background)
+            .onSizeChanged { size -> with(density) { size.height.toDp() }.let { if (it != headerHeight) headerHeight = it } }) {
+        Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { touched(); close() }, colors = icons) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Guardar y volver") }
             Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
                 Text(document.title, color = colors.content, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
@@ -208,7 +221,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
             IconButton(enabled = model.canRedo, colors = icons, onClick = { touched(); model.redo(); if (model.visual) visualGeneration++ }) { Icon(Icons.AutoMirrored.Outlined.Redo, "Rehacer") }
             IconButton(colors = icons, onClick = { touched(); dark = !dark; style.dark = dark }) { Icon(if (dark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode, if (dark) "Hoja clara" else "Hoja oscura") }
         }
-        if (toolsVisible) Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp).clip(RoundedCornerShape(50)).background(colors.selected).padding(4.dp)) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp).clip(RoundedCornerShape(50)).background(colors.selected).padding(4.dp)) {
             listOf(true to "Visual", false to "Fuente").forEach { (visual, label) ->
                 val active = model.visual == visual
                 Text(label, color = if (active) colors.background else colors.content, fontSize = 15.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
@@ -218,15 +231,18 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                         .padding(horizontal = 20.dp, vertical = 10.dp))
             }
         }
+        } }
         if (!model.visual) CompositionLocalProvider(LocalTextSelectionColors provides selection) {
-          Box(Modifier.weight(1f).fillMaxWidth()) {
+          // El hueco superior forma parte del contenido desplazable: al ocultar las herramientas el texto queda quieto.
+          Column(Modifier.fillMaxSize().verticalScroll(sourceScroll)) {
+           Spacer(Modifier.height(headerHeight))
+           Box(Modifier.fillMaxWidth().heightIn(min = (sheetHeight - headerHeight).coerceAtLeast(0.dp))) {
             if (field.text.isEmpty()) Text("# Una idea nueva\n\nEmpieza a escribir…", color = colors.muted, fontFamily = sheetFont(font), fontSize = 17.sp, lineHeight = 27.sp,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp))
             BasicTextField(state = field, enabled = model.loaded,
                 textStyle = TextStyle(color = colors.content, fontFamily = sheetFont(font), fontSize = 17.sp, lineHeight = 27.sp),
                 cursorBrush = SolidColor(colors.content),
-                scrollState = sourceScroll,
-                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                modifier = Modifier.fillMaxWidth().heightIn(min = (sheetHeight - headerHeight).coerceAtLeast(0.dp)).pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -235,10 +251,14 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                         }
                     }
                 }.padding(horizontal = 24.dp, vertical = 20.dp))
+           }
           }
         } else key(visualGeneration) {
             val session = remember { UUID.randomUUID().toString() }
-            AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { context ->
+            // Imágenes, HTML y otras construcciones no compatibles se acotan como fuente protegida.
+            val protection = remember { MarkdownProtection.protect(model.source) }
+            SideEffect { visualProtection = protection }
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                 webReady = false; initialized = false
                 WebView(context).apply {
                     visualWeb = this
@@ -262,9 +282,10 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                             val data = JSONObject(message.data.orEmpty())
                             if (data.optString("sessionId") != session) return@runCatching
                             when (data.optString("type")) {
-                                "change" -> if (initialized) model.edit(data.getJSONObject("payload").getString("source"))
+                                "change" -> if (initialized) model.edit(MarkdownProtection.restore(data.getJSONObject("payload").getString("source"), protection))
                                 "loaded" -> {
                                     initialized = true; webReady = true
+                                    evaluateJavascript(topInsetScript(headerHeight.value), null)
                                     evaluateJavascript("window.editorSetScrollFraction?.($visualScrollFraction)", null)
                                 }
                                 "error" -> { model.error = data.getJSONObject("payload").optString("message"); model.visual = false }
@@ -277,7 +298,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest) = true
                         override fun onPageFinished(view: WebView?, url: String?) {
                             applyStyle()
-                            evaluateJavascript("window.startEditor(${JSONObject.quote(model.source)},${JSONObject.quote(session)});", null)
+                            evaluateJavascript("window.startEditor(${JSONObject.quote(protection?.text ?: model.source)},${JSONObject.quote(session)});", null)
                         }
                     }
                     webChromeClient = object : WebChromeClient() {
@@ -291,7 +312,17 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                 }
             }, update = { it.setBackgroundColor(colors.background.toArgb()) }, onRelease = { it.stopLoading(); it.destroy(); if (visualWeb === it) visualWeb = null })
         }
-        // Barra de formato abajo, sobre el teclado (pantalla 7).
+        if (toolsVisible) tools()
+        else IconButton(onClick = ::touched, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(50)).background(colors.background.copy(alpha = .85f)), colors = icons) {
+            Icon(Icons.Outlined.ExpandMore, "Mostrar herramientas")
+        }
+        protectedHint?.let { message ->
+            Text(message, color = colors.background, fontSize = 13.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                .clip(RoundedCornerShape(12.dp)).background(colors.content.copy(alpha = .9f)).padding(horizontal = 14.dp, vertical = 10.dp))
+        }
+        }
+        // Barra de formato abajo, sobre el teclado (pantalla 7). Ocupa su propio espacio para que el cursor nunca quede
+        // tapado; al ocultarla solo crece el borde inferior de la hoja, el texto no se desplaza.
         if (toolsVisible) {
             HorizontalDivider(color = colors.divider)
             MarkdownToolbar(colors, font, model.loaded && (!model.visual || webReady), onFont = { font = it; style.font = it }, onCommand = ::command,
@@ -303,10 +334,13 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
     } }
     if (visualLink) LinkDialog(true, onDismiss = { visualLink = false }) { url -> visualCommand("link", url); visualLink = false }
     if (warning) AlertDialog(onDismissRequest = { warning = false }, title = { Text("Conserva esta nota en Fuente") },
-        text = { Text("La nota contiene sintaxis que no podemos preservar fielmente en Visual (por ejemplo HTML, imágenes, tablas incompletas o extensiones). El texto fuente se conserva completo; puedes seguir editándolo aquí.") },
+        text = { Text("La nota contiene sintaxis que no podemos acotar de forma segura en Visual (por ejemplo un bloque de código sin cerrar o los caracteres ⟦ ⟧). El texto fuente se conserva completo; puedes seguir editándolo aquí.") },
         confirmButton = { TextButton(onClick = { warning = false }) { Text("Continuar en Fuente") } })
     model.error?.let { error -> AlertDialog(onDismissRequest = { model.error = null }, title = { Text("Aviso de Markdown") }, text = { Text(error) }, confirmButton = { TextButton(onClick = { model.error = null }) { Text("Entendido") } }) }
 }
+
+/** Reserva arriba del editor visual el alto de las herramientas flotantes (CSS px ≈ dp en el WebView). */
+private fun topInsetScript(dp: Float) = "document.body&&(document.body.style.paddingTop='${dp.coerceIn(0f, 600f)}px');"
 
 @Composable
 private fun LinkDialog(hasSelection: Boolean, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {

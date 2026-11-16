@@ -173,3 +173,14 @@ V1 se acepta cuando los requisitos obligatorios están implementados y la matriz
 | WEB-06 | ACTION_VIEW de HTML/HTM, XHTML, y archivo privado | App resoluble por MIME; copia privada tras borrar fuente; denegar rutas privadas. |
 
 Desde este cambio SEC-03 se prueba con B revocado explícitamente: el default de nuevos HTML es HTTPS permitido. Las capturas y copias mantienen OFFLINE. No confundir la captura de la página cargada con una réplica completa del sitio; vídeos, canvas, frames y recursos no cargados requieren pruebas/manuales y no tienen garantía de preservación.
+
+## Feedback de legibilidad y usabilidad (2026-11-16)
+
+| ID | Escenario | Resultado esperado |
+|---|---|---|
+| UX-01 | Nota Markdown en Fuente y Visual: tocar, esperar 5 s a que se oculten las herramientas, volver a tocar | El texto no se desplaza; las herramientas flotan sobre la hoja y el contenido empieza bajo su alto. |
+| UX-02 | Nota con imágenes, HTML en línea y de bloque, autoenlaces, definiciones y referencias, tablas irregulares, `$$`, tareas | Visual se abre; los fragmentos aparecen como fuente protegida editable; sin editar, la fuente se restaura byte a byte; con edición fuera, los fragmentos se conservan. Bloque sin cerrar o `⟦`/`⟧` en la nota: aviso y Fuente. (JVM `MarkdownProtectionTest`, web `protected raw fragments…`). |
+| UX-03 | Listas `- [texto](url)` y tablas `|:-|-:|` | Editables en Visual sin aviso (`MarkdownProtectionTest.supportedNotesAreUntouched`). |
+| UX-04 | Enlace `raw.githack.com` u otro sitio con verificación Cloudflare en el navegador | Mensaje de verificación, la página avanza sola; cookies borradas al salir; «Abrir en otra aplicación» disponible. Manual en teléfono. |
+| UX-05 | HTML con input, textarea, select, radio, checkbox y contenteditable: escribir y girar el teléfono | Valores intactos (la Activity no se recrea). Manual en teléfono. |
+| UX-06 | Lo mismo y después Recargar, cambiar «Permitir recursos HTTPS», cerrar y reabrir el documento | Valores restaurados desde el respaldo; contraseñas nunca guardadas; campos tardíos restaurados; «Borrar respaldo de formularios» limpia (web `form fields are buffered…`, JVM `formStateIsAccepted…`). |

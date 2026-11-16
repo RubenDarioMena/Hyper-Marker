@@ -81,3 +81,26 @@ test('compiled React fixture resolves relative assets and remains interactive',a
  try{const page=await browser.newPage();await page.goto('http://127.0.0.1:'+server.address().port+'/nested/index.html');await page.locator('#react-counter').click();assert.equal(await page.locator('#react-counter').textContent(),'Explorar · 1');}
  finally{await browser.close();await new Promise(done=>server.close(done));}
 });
+test('protected raw fragments survive a Visual round trip byte for byte',async()=>{
+ const root=resolve('../app/src/main/assets/editor');
+ const server=createServer(async(req,res)=>{try{const file=resolve(root,'.'+req.url);if(!file.startsWith(root+'/'))throw Error();const body=await readFile(file);res.setHeader('Content-Type',({'.js':'application/javascript','.css':'text/css','.html':'text/html'})[extname(file)]||'text/plain');res.end(body);}catch{res.statusCode=404;res.end();}});
+ await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':chromium.executablePath()),headless:true});
+ try{const page=await browser.newPage();
+ await page.addInitScript(()=>{window.events=[];window.MarkdownBridge={postMessage:value=>events.push(JSON.parse(value))};});await page.goto(origin+'/index.html');
+ // Mismo formato que produce MarkdownProtection en Android.
+ const block='```hm-raw-abc12345\n<div align="center">\n  <img src="logo.png" width="80">\n</div>\n```';
+ const table='```hm-raw-abc12345\n| A | B |\n| - |\n| sin | cerrar |\n```';
+ const source=`# Título\n\n${block}\n\nTexto con \`⟦![foto](img/a.png)⟧\` y \`⟦<kbd>Ctrl</kbd>⟧\` en línea y [enlace](https://example.com).\n\n${table}\n\n| A | B |\n| --- | --- |\n| \`⟦<b>x</b>⟧\` | y |\n`;
+ await page.evaluate(source=>startEditor(source,'test'),source);
+ for(let i=0;i<50&&!await page.evaluate(()=>events.some(e=>e.type==='loaded'));i++)await new Promise(r=>setTimeout(r,50));
+ await page.locator('.ProseMirror h1').click();await page.keyboard.press('End');await page.keyboard.type(' editado');
+ for(let i=0;i<50&&!await page.evaluate(()=>events.some(e=>e.type==='change'));i++)await new Promise(r=>setTimeout(r,50));
+ const markdown=await page.evaluate(()=>editorMarkdown());
+ assert.match(markdown,/# Título editado/);
+ assert.ok(markdown.includes(block),markdown);assert.ok(markdown.includes(table),markdown);
+ assert.ok(markdown.includes('`⟦![foto](img/a.png)⟧`'),markdown);assert.ok(markdown.includes('`⟦<kbd>Ctrl</kbd>⟧`'),markdown);
+ assert.ok(markdown.includes('`⟦<b>x</b>⟧`'),markdown);
+ await new Promise(r=>setTimeout(r,10));
+ }finally{await browser.close();await new Promise(done=>server.close(done));}
+});

@@ -23,13 +23,15 @@ class BrowserViewModel(private val repository: LibraryRepository) : ViewModel() 
     var failed by mutableStateOf(false)
     private var failedLoad = false
     fun started(view: BrowserWebView, started: Boolean) {
-        if (started) { loading = true; failedLoad = false; error = null; savedId = null }
+        if (started) { loading = true; failedLoad = false; error = null; savedId = null; verifying = false }
         if (view.progress == 100) loading = false
         if (view.url != null) { currentUrl = view.url; if (started || !loading) address = view.url.orEmpty() }
         title = view.title.orEmpty(); back = view.canGoBack(); forward = view.canGoForward()
     }
     fun loadProblem(message: String) { failedLoad = true; loading = false; error = message }
-    val canSave get() = !saving && !loading && !failed && !failedLoad && currentUrl?.let(WebAddress::permitted) == true
+    var verifying by mutableStateOf(false)
+    fun verifyingPage() { verifying = true }
+    val canSave get() = !saving && !loading && !failed && !failedLoad && !verifying && currentUrl?.let(WebAddress::permitted) == true
     fun save(view: BrowserWebView, folder: String?) {
         if (!canSave) return
         val source = currentUrl ?: return

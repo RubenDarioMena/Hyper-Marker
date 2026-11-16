@@ -184,6 +184,16 @@ Siguiente paso concreto:
 - El APK versionado en `downloads/Hyper-Marker-feedback-debug.apk` tiene firma SHA-256 distinta (`4452e12f73a79a348ce11cf4f0e4818aab5483258e6b7b00d4441e8328a5c303`); el APK local se conserva por separado para dispositivos con la firma `42909c43…`. `adb devices -l` no detectó teléfonos/tablets: sin respaldos ni instalación en esta sesión.
 - Publicado en `origin/main` mediante fast-forward más el commit documental `a4ec285`. Pendiente: al conectar los dispositivos, hacer respaldo fresco y comprobar firma/datos antes de instalar. La app aún declara `1.0.0` (1), así que esta entrega no cambia el versionCode.
 
+## Actualización de Samsung Tab SM-P613 (2026-11-10)
+
+- ADB detectó `R52X300Y59W`, Android conectado como `device`. Antes de actualizar se extrajo el APK anterior y se respaldaron `files/`, `databases/`, `shared_prefs/` y `no_backup/` en `artifacts/phone-backup/tab-feedback-main-20261110-014639/`. El TAR se pudo listar y extraer; SQLite del respaldo devuelve `PRAGMA integrity_check = ok`, user_version 3. Incluye 2 HTML originales.
+- Certificado instalado y APK nuevo coinciden: SHA-256 `42909c43e7ba7038ddba222d89f78a491b653268f5c67da86d3cbff3b8742853`. `adb install -r artifacts/Hyper-Marker-feedback-main-debug.apk` conservó la instalación; versión 1.0.0 (1). `MainActivity` quedó reanudada, proceso `com.hypermarker` activo (PID 13771). Sin pruebas instrumentadas.
+
+## Actualización de Samsung S24 Ultra SM-S928U (2026-11-10)
+
+- ADB detectó `R5CX732ZD2K`. Se guardó el APK previo y el respaldo completo de datos en `artifacts/phone-backup/s24-feedback-main-20261110-014857/`. La transferencia TAR inicial se truncó mientras el dispositivo se desconectó; no se usó esa copia. Al reconectar, se detuvo la app y se creó `app-data.tar.gz`; `gzip -t` y `tar -tzf` PASS; SQLite del respaldo `integrity_check = ok`, user_version 3, 16 documentos.
+- El certificado del APK previo coincide con el nuevo (`42909c43e7ba7038ddba222d89f78a491b653268f5c67da86d3cbff3b8742853`). `adb install -r artifacts/Hyper-Marker-feedback-main-debug.apk`: **Success**. `MainActivity` arranque COLD con Status ok, proceso activo (PID 31628) y en primer plano. Versión 1.0.0 (1). Sin pruebas instrumentadas.
+
 ## Propuesta de rediseño, Flow atrevido y selector de elementos (2026-11-16)
 
 - Fuente: `bed525a`, rama `claude/relaxed-brahmagupta-eop7d6`, árbol limpio al comenzar. **Sólo documentación; sin cambios de código, build ni pruebas en esta sesión.**
@@ -215,3 +225,27 @@ Siguiente paso concreto:
 - **No verificado**: ninguna prueba instrumentada ni táctil (sin emulador ni dispositivo). Pendiente en dispositivo: gestos del lienzo con fotos, transición del punto abierto, giro del anillo, Photo Picker real, captura de miniatura HTML al cerrar el lector, lector (pantallas 5–6) sin captura automática porque Robolectric no ejecuta WebView, TalkBack, rendimiento con muchas fotos y `AppWorkflowTest` (se conservaron las descripciones que usa).
 - **Precaución**: instalar este APK migra la base a v4. En S24/Tab respaldar antes con `run-as`, como en v2 y v3.
 - Siguiente paso concreto: instalar el APK en el S24 tras respaldo, recorrer PICK-01…06, FLOW-09…15 y PREV-01…04 de [docs/testing.md](docs/testing.md), ejecutar la suite instrumentada en emulador y registrar resultados; confirmar o cambiar las decisiones 5–7.
+
+## Feedback de legibilidad y usabilidad (2026-11-16)
+
+- Fuente: rama `claude/legibilidad-usabilidad-issues-s9pq6z` sobre `bed525a`, árbol limpio al comenzar. Especificación original intacta. Cuatro puntos de feedback del propietario.
+- **Cabecera Markdown que desplazaba el texto:** las herramientas de la hoja flotan sobre el contenido. En Fuente el hueco superior forma parte del área desplazable; en Visual es `padding-top` del editor. Ocultar/mostrar ya no mueve el texto; el botón «Mostrar herramientas» también flota.
+- **Imágenes, tablas o enlaces bloqueaban Visual:** nuevo `MarkdownProtection`. Bloques no compatibles → bloque de código `hm-raw-<nonce>`; fragmentos en línea (imágenes, HTML, autoenlaces, `{…}`, referencias a definiciones acotadas) → código en línea `⟦…⟧`, con la fuente visible y editable. Al guardar/volver a Fuente se desenvuelven tal cual. También en la vista Markdown remota de solo lectura. `MarkdownPolicy` deja de marcar `- [texto](url)` y delimitadores `|:-|`. Sólo un bloque sin cerrar o `⟦`/`⟧` en la nota mantienen el aviso.
+- **githack se quedaba en el aviso:** causa probable, la verificación de Cloudflare sin cookies (bucle). Cookies propias sólo durante la sesión del navegador, borradas al entrar/salir; `Worker` permitido en el navegador (WebRTC sigue bloqueado); estado «verificando» en vez de error; botón «Abrir en otra aplicación». Decisión registrada en `docs/proposals/web-browser.md`. Desde el entorno cloud githack respondió 200 sin desafío, así que **no se reprodujo**.
+- **Formularios perdidos al girar:** `configChanges` de orientación/tamaño/teclado en `MainActivity` (la Activity y los WebView ya no se recrean). Respaldo adicional `form.state` → `documents/<id>/form-buffer.json` (fuera de la raíz servida), restaurado tras `controller.ready`, con reintentos para campos tardíos; nunca contraseñas, archivos ni campos ocultos. Menú «Borrar respaldo de formularios».
+- Validación (entorno cloud, JDK 21, SDK 36/Build Tools 35 instalados con autorización del propietario): `testDebugUnitTest` **69/69 PASS**, `lintDebug` **PASS** (0 errores, 56 advertencias), `assembleDebug` y `assembleDebugAndroidTest` **PASS**; web `npm test` **19/19 PASS** (Chromium 1243). Nuevas pruebas: `MarkdownProtectionTest` (7), formularios en `BridgeValidatorTest`, `BrowserCookiesTest`, web de respaldo/restauración de formularios y round trip de fragmentos protegidos con el Milkdown empaquetado.
+- No ejecutado: pruebas instrumentadas, prueba física de rotación, del desafío de Cloudflare en teléfono y de la UI flotante. APK no instalado ni publicado; `downloads/` sin cambios. La firma del APK de este entorno no coincide con las instalaciones personales.
+- Siguiente paso concreto: en el S24, abrir un enlace raw.githack.com, girar con un formulario rellenado, recargar/reabrir, y abrir en Visual una nota con imágenes/HTML/tablas comprobando que la fuente se conserva; registrar resultados (UX-01…UX-06 en `docs/testing.md`).
+
+## Fusión de rediseño y legibilidad en main (2026-11-16)
+
+- Origen: `main` en `bed525a`; fast-forward a `claude/relaxed-brahmagupta-eop7d6` (`22f544f`, rediseño R0–R6) y fusión `--no-ff` de `claude/legibilidad-usabilidad-issues-s9pq6z` (`5e49b76`). Ambas ramas partían de `bed525a`. Se conservaron las notas locales de instalación del 2026-11-10 que estaban sin commitear.
+- Conflictos resueltos:
+  - `MarkdownScreen.kt`: estilo y orden del rediseño (cabecera 60 dp con «Guardado», pestañas Visual/Fuente, barra de formato abajo) con la cabecera **flotante** de legibilidad (hueco superior desplazable en Fuente, `padding-top` en Visual) y `MarkdownProtection`. La barra de formato inferior queda en el flujo, no flotante, para que el cursor nunca quede tapado al escribir; al ocultarla sólo crece el borde inferior y el texto no se desplaza.
+  - `BrowserScreen.kt`: barra inferior del rediseño más el aviso «verificando» y el botón «Abrir en otra aplicación» de legibilidad.
+  - `LibraryRepository.kt`: se conservan `MAX_FLOW_LINKS` y `FORM_BUFFER_LIMIT`. `progress.md`: ambas entradas.
+- Validación local (macOS, JBR de Android Studio): `testDebugUnitTest` **93/93 PASS**, `lintDebug` 0 errores / 65 advertencias, `assembleDebug` PASS. Web: `controller.test.mjs` + `editor.test.mjs` **18/18 PASS**; `feedback-review.test.mjs` (no tocado por ninguna rama) se quedó colgado sin CPU en este entorno y se detuvo: **no verificado**.
+- APK `artifacts/Hyper-Marker-redesign-main-debug.apk` (no versionado), SHA-256 `4f6fe339035f3433fccfa0cb013021c49b10dc1004a0d81bde8bf28957eba74b`; `com.hypermarker` 1.0.0 (1), firma `42909c43e7ba7038ddba222d89f78a491b653268f5c67da86d3cbff3b8742853` (coincide con S24 y Tab). `adb devices -l`: ninguno conectado; sin instalación.
+- **Precaución**: este APK migra la base a Room v4 (`MIGRATION_3_4`). Respaldar con `run-as` antes de instalar en cada dispositivo.
+- No verificado: UI combinada de Markdown en dispositivo (cabecera flotante + barra inferior con teclado), pruebas instrumentadas.
+- Siguiente paso concreto: conectar los dispositivos, respaldar datos, `adb install -r` y recorrer UX-01…06, PICK-01…06, FLOW-09…15 y PREV-01…04 de `docs/testing.md`.

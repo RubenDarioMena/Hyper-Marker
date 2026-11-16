@@ -225,6 +225,7 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                         when (event.optString("type")) {
                             "controller.ready" -> {
                                 model.finishDrawing(false); ready = true; web?.command("annotations", model.jsonAnnotations())
+                                model.formFields(pageKey()).takeIf { it.length() > 0 }?.let { web?.command("form.restore", JSONObject().put("fields", it)) }
                                 pendingInspect?.let { id -> web?.command("inspect", JSONObject().put("id", id)); pendingInspect = null }
                             }
                             "tap" -> if (model.cross == null) { chrome = !chrome; menu = false; drawPanel = null }
@@ -326,6 +327,8 @@ fun ReaderScreen(document: Document, repository: LibraryRepository, onClose: () 
                 enabled = model.loaded && !model.drawingActive && !exporting) {
                 menu = false; exportFeedback.launch(FeedbackExport.safeName(document.title) + "-feedback.zip")
             }
+            if (model.formsSaved) MenuRow(Icons.Outlined.DeleteSweep, "Borrar respaldo de formularios", tone,
+                supporting = "Lo escrito se restaura al recargar o reabrir; esto lo descarta") { menu = false; model.clearForms(); ready = false; generation++ }
             MenuRow(Icons.Outlined.Terminal, "Consola (${model.logs.size})", tone) { menu = false; console = true }
             MenuRow(Icons.Outlined.EditNote, "Crear nota Markdown", tone) { menu = false; rememberPosition(); scope.launch { if (model.flush()) onMarkdown() } }
             if (document.type != "WEB_SNAPSHOT") MenuRow(Icons.Outlined.Language, "Permitir recursos HTTPS", tone, trailing = { Switch(document.networkAllowed, { ready = false; model.network(it) }, colors = SwitchDefaults.colors(checkedTrackColor = tone.content, checkedThumbColor = if (tone == GlassTone.LIGHT) Color.White else Color.Black, uncheckedThumbColor = tone.muted, uncheckedTrackColor = Color.Transparent, uncheckedBorderColor = tone.muted)) }) { ready = false; model.network(!document.networkAllowed) }

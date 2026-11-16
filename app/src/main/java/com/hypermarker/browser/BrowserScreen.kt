@@ -1,5 +1,7 @@
 package com.hypermarker.browser
 
+import android.content.Intent
+import androidx.core.net.toUri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -49,6 +53,8 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
         }.onFailure { model.error = it.message }
     }
     BackHandler { if (!model.saving) { if (web?.canGoBack() == true) web?.goBack() else onClose() } }
+    DisposableEffect(Unit) { BrowserCookies.enter(); onDispose { BrowserCookies.leave() } }
+    val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, web) {
         val observer = LifecycleEventObserver { _, event ->
@@ -70,7 +76,7 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
                 AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                     BrowserWebView(context, model::started, model::loadProblem, crashed = {
                         model.failed = true; model.loading = false; model.error = "El navegador se cerró. Pulsa Recargar para volver a abrir la página."
-                    }).also { view ->
+                    }, verifying = model::verifyingPage).also { view ->
                         web = view
                         val url = if (initialUrl != null && initialUrl != lastInitial) initialUrl else model.currentUrl
                         lastInitial = initialUrl
@@ -90,6 +96,8 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
         Column(Modifier.fillMaxWidth().background(hm.paper)) {
             HmDivider()
             model.error?.let { Text(it, Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = hm.danger, style = MaterialTheme.typography.bodySmall) }
+            if (model.verifying) Text("El sitio está verificando el navegador; la página continuará sola en unos segundos.",
+                Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = hm.muted, style = MaterialTheme.typography.bodySmall)
             val saved = model.savedId
             if (saved != null) PrimaryButton("Estudiar la copia guardada", { onSaved(saved) }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), icon = Icons.Outlined.MenuBook)
             else PrimaryButton(if (model.saving) "Guardando copia…" else "Guardar copia para estudiar", { choosing = true },
@@ -108,6 +116,14 @@ fun BrowserScreen(repository: LibraryRepository, initialUrl: String?, folderId: 
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { web?.goBack() }, enabled = model.back && !model.saving) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Página anterior", tint = if (model.back) hm.ink else hm.border) }
                 IconButton(onClick = { web?.goForward() }, enabled = model.forward && !model.saving) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Página siguiente", tint = if (model.forward) hm.ink else hm.border) }
+                // Alternativa para sitios que el navegador integrado no admite (inicios de sesión, descargas…).
+                val external = !model.saving && model.currentUrl?.let(WebAddress::permitted) == true
+                IconButton(onClick = {
+                    model.currentUrl?.takeIf(WebAddress::permitted)?.let { url ->
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)) }
+                            .onFailure { model.error = "No hay otra aplicación para abrir esta dirección." }
+                    }
+                }, enabled = external) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, "Abrir en otra aplicación", tint = if (external) hm.ink else hm.border) }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onClose, enabled = !model.saving) {
                     Icon(Icons.AutoMirrored.Outlined.LibraryBooks, null, tint = hm.ink); Spacer(Modifier.width(8.dp)); Text("Biblioteca", color = hm.ink)
