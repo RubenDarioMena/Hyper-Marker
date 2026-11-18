@@ -1,0 +1,380 @@
+{
+ "type": "flowchart-v2",
+ "supported": true,
+ "direction": "TB",
+ "nodes": [
+  {
+   "id": "E",
+   "label": "INFRAESTRUCTURA INICIAL<br>Generadores y almacenamiento",
+   "shape": "square",
+   "x": 556.9371335169081,
+   "y": 55.59954488346309,
+   "width": 157.45173506517816,
+   "height": 87.19923390535112
+  },
+  {
+   "id": "A1",
+   "label": "Transmutación nuclear<br>Producir elementos escasos",
+   "shape": "square",
+   "x": 805.0179100200982,
+   "y": 229.09801320969413,
+   "width": 190.90456066710365,
+   "height": 71.79936983755806
+  },
+  {
+   "id": "A2",
+   "label": "Materiales ultradensos<br>Blindaje y munición",
+   "shape": "square",
+   "x": 750.4128837217082,
+   "y": 353.19688690666567,
+   "width": 194.42010321592986,
+   "height": 56.399499872865874
+  },
+  {
+   "id": "A3",
+   "label": "Confinamiento neutrónico<br>Experimental",
+   "shape": "square",
+   "x": 687.6499456684652,
+   "y": 477.2958077788301,
+   "width": 151.99870734465148,
+   "height": 71.79936983755806
+  },
+  {
+   "id": "A4",
+   "label": "Colapso gravitacional<br>Consumo energético extremo",
+   "shape": "square",
+   "x": 740.0463709616565,
+   "y": 609.0946400457442,
+   "width": 183.58613146960153,
+   "height": 71.79941701275094
+  },
+  {
+   "id": "B1",
+   "label": "Acelerador de partículas<br>Investigación",
+   "shape": "square",
+   "x": 308.85634521992006,
+   "y": 271.74764266413996,
+   "width": 203.65443493438855,
+   "height": 56.399499872865874
+  },
+  {
+   "id": "B2",
+   "label": "Tecnologías cuánticas<br>Sensores y dispositivos",
+   "shape": "square",
+   "x": 308.85634521992006,
+   "y": 352.14693222626755,
+   "width": 197.92010153870115,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "B3",
+   "label": "Colisiones de alta energía<br>Experimentos extremos",
+   "shape": "square",
+   "x": 364.72695221157755,
+   "y": 476.2458295108355,
+   "width": 197.4826223875016,
+   "height": 71.79936983755806
+  },
+  {
+   "id": "B4",
+   "label": "Microagujeros negros<br>Hipotéticos e inestables",
+   "shape": "square",
+   "x": 422.03503450556974,
+   "y": 600.344703207807,
+   "width": 203.2325471844368,
+   "height": 56.399499872865874
+  },
+  {
+   "id": "R",
+   "label": "Cañón electromagnético<br>Tecnología temprana",
+   "shape": "square",
+   "x": 1002.4636178191689,
+   "y": 894.392091327425,
+   "width": 200.70138579790154,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "AM",
+   "label": "Proyectiles ultradensos<br>Mejora de combate",
+   "shape": "square",
+   "x": 883.4333883711142,
+   "y": 767.1932413557325,
+   "width": 198.06080155147438,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "BM",
+   "label": "Dispositivos cuánticos<br>Mejora de combate",
+   "shape": "square",
+   "x": 106.62117596341339,
+   "y": 767.1932413557325,
+   "width": 189.2326954189303,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "BH",
+   "label": "CAPTURA DE AGUJERO NEGRO<br>Cualquiera de las dos rutas",
+   "shape": "square",
+   "x": 653.8494860701857,
+   "y": 782.5930641452319,
+   "width": 181.10778271149866,
+   "height": 87.19919262705736
+  },
+  {
+   "id": "HY",
+   "label": "Investigación híbrida<br>Requiere ambas ramas",
+   "shape": "square",
+   "x": 335.50978668403746,
+   "y": 777.4598370572584,
+   "width": 188.54521133304786,
+   "height": 56.39945269767299
+  },
+  {
+   "id": "P",
+   "label": "Contención básica<br>Alimentación y control",
+   "shape": "square",
+   "x": 653.8494860701857,
+   "y": 894.392091327425,
+   "width": 190.16872200851626,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "ADV",
+   "label": "Control avanzado<br>Estabilidad y eficiencia",
+   "shape": "square",
+   "x": 335.5097748902392,
+   "y": 894.392091327425,
+   "width": 195.1232494658494,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "G",
+   "label": "Generador gravitacional<br>Extracción de energía de giro",
+   "shape": "square",
+   "x": 337.048830176649,
+   "y": 1038.4908880470998,
+   "width": 204.3575811843081,
+   "height": 71.79941701275094
+  },
+  {
+   "id": "W",
+   "label": "Núcleo gravitacional cargado",
+   "shape": "square",
+   "x": 656.3007562675737,
+   "y": 1035.924180152727,
+   "width": 175.46119517457345,
+   "height": 56.39954704805876
+  },
+  {
+   "id": "GRID",
+   "label": "Energía para la fábrica",
+   "shape": "square",
+   "x": 337.048830176649,
+   "y": 1134.8899980894078,
+   "width": 189.81082740771018,
+   "height": 40.99967708336658
+  },
+  {
+   "id": "S",
+   "label": "Proyectil gravitacional",
+   "shape": "square",
+   "x": 839.2578773028712,
+   "y": 1134.8899980894078,
+   "width": 192.13295551458134,
+   "height": 40.99967708336658
+  },
+  {
+   "id": "U",
+   "label": "Superarma de etapa final",
+   "shape": "square",
+   "x": 839.2578773028712,
+   "y": 1215.8892853422165,
+   "width": 208.51369208969467,
+   "height": 40.99958273298081
+  }
+ ],
+ "edges": [
+  {
+   "from": "A1",
+   "to": "A2",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "A2",
+   "to": "A3",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "A3",
+   "to": "A4",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "B1",
+   "to": "B2",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "B2",
+   "to": "B3",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "B3",
+   "to": "B4",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "E",
+   "to": "A1",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "E",
+   "to": "B1",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "A1",
+   "to": "R",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "A2",
+   "to": "AM",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "B2",
+   "to": "BM",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "A4",
+   "to": "BH",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "B4",
+   "to": "BH",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "A3",
+   "to": "HY",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "B3",
+   "to": "HY",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "BH",
+   "to": "P",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "HY",
+   "to": "ADV",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "P",
+   "to": "G",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "P",
+   "to": "W",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "ADV",
+   "to": "G",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "ADV",
+   "to": "W",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "G",
+   "to": "GRID",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "W",
+   "to": "S",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "R",
+   "to": "S",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "S",
+   "to": "U",
+   "label": "",
+   "stroke": "normal"
+  }
+ ],
+ "groups": [
+  {
+   "id": "A",
+   "title": "RAMA A · MATERIA EXTREMA",
+   "nodes": [
+    "A1",
+    "A2",
+    "A3",
+    "A4"
+   ],
+   "x": 756.0603911748947,
+   "y": 409.09642408535865,
+   "width": 336.81922491122685,
+   "height": 519.7954283120454,
+   "color": "#e879f9"
+  },
+  {
+   "id": "B",
+   "title": "RAMA B · FÍSICA DE PARTÍCULAS",
+   "nodes": [
+    "B1",
+    "B2",
+    "B3",
+    "B4"
+   ],
+   "x": 365.34026510044987,
+   "y": 424.8170381864616,
+   "width": 364.6218068987787,
+   "height": 455.4545036444659,
+   "color": "#2dd4bf"
+  }
+ ]
+}

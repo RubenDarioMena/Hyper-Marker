@@ -1,0 +1,46 @@
+flowchart TB
+    E["INFRAESTRUCTURA INICIAL<br/>Generadores y almacenamiento"] 
+
+    subgraph A["RAMA A · MATERIA EXTREMA"]
+      direction TB
+      A1["Transmutación nuclear<br/>Producir elementos escasos"]
+      A2["Materiales ultradensos<br/>Blindaje y munición"]
+      A3["Confinamiento neutrónico<br/>Experimental"]
+      A4["Colapso gravitacional<br/>Consumo energético extremo"]
+      A1 --> A2 --> A3 --> A4
+    end
+
+    subgraph B["RAMA B · FÍSICA DE PARTÍCULAS"]
+      direction TB
+      B1["Acelerador de partículas<br/>Investigación"]
+      B2["Tecnologías cuánticas<br/>Sensores y dispositivos"]
+      B3["Colisiones de alta energía<br/>Experimentos extremos"]
+      B4["Microagujeros negros<br/>Hipotéticos e inestables"]
+      B1 --> B2 --> B3 --> B4
+    end
+
+    E --> A1
+    E --> B1
+
+    A1 --> R["Cañón electromagnético<br/>Tecnología temprana"]
+    A2 --> AM["Proyectiles ultradensos<br/>Mejora de combate"]
+    B2 --> BM["Dispositivos cuánticos<br/>Mejora de combate"]
+
+    A4 --> BH["CAPTURA DE AGUJERO NEGRO<br/>Cualquiera de las dos rutas"]
+    B4 --> BH
+
+    A3 --> HY["Investigación híbrida<br/>Requiere ambas ramas"]
+    B3 --> HY
+
+    BH --> P["Contención básica<br/>Alimentación y control"]
+    HY --> ADV["Control avanzado<br/>Estabilidad y eficiencia"]
+
+    P --> G["Generador gravitacional<br/>Extracción de energía de giro"]
+    P --> W["Núcleo gravitacional cargado"]
+    ADV --> G
+    ADV --> W
+
+    G --> GRID["Energía para la fábrica"]
+    W --> S["Proyectil gravitacional"]
+    R --> S
+    S --> U["Superarma de etapa final"]

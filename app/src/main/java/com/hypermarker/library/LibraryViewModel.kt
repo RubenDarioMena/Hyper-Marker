@@ -83,8 +83,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         openedId = null; returnStack.clear()
         require(pending == null) { "Elige una entrada o cancela la importación anterior" }
         pendingParent = folderId
-        if (!tree && uris.size == 1 && repository.importer.displayName(uris.first()).endsWith(".md", true)) {
+        val single = if (!tree && uris.size == 1) repository.importer.displayName(uris.first()) else null
+        if (single != null && single.endsWith(".md", true)) {
             openedId = repository.importMarkdown(uris.first(), folderId).id
+        } else if (single != null && (single.endsWith(".mmd", true) || single.endsWith(".mermaid", true))) {
+            openedId = repository.importMermaid(uris.first(), folderId).id
         } else {
             val prepared = withContext(Dispatchers.IO) { repository.importer.prepare(uris, tree) }
             if (prepared.preferred != null) openedId = repository.finishImport(prepared, prepared.preferred, pendingParent).id

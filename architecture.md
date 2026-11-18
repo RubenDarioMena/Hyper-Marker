@@ -13,12 +13,14 @@ app/src/main/java/com/hypermarker/
   viewer/                   WebView, ReaderViewModel, cromo de cristal, cruceta y acciones
   markdown/                 Fuente/Visual, barra de formato, política de round-trip y guardado
   flow/                     Flow Dots: canvas, gestos, reglas puras del grafo y cámara
+  mermaid/                  Diagramas Mermaid: código, visor aislado, copia a Flow y exportación
   bridge/                   Validación del protocolo de eventos
   security/                 Rutas e invariantes de jerarquía
 app/src/main/assets/
   annotation/controller.js  Hit testing, resaltado, marcadores, SVG y gestos
   security/                 Bootstrap offline previo a scripts del documento
   editor/                   Milkdown local compilado desde web/src/
+  mermaid/                  Mermaid 12.3.0 sin cambios + visor propio (web/src/mermaid-viewer.js)
   licenses/                 Avisos y textos de terceros distribuidos con el APK
 ```
 
@@ -52,6 +54,7 @@ Los esquemas Room se exportan en `app/schemas/com.hypermarker.storage.LibraryDat
 | Annotation | id, documentId, kind, pageKey, payload, schemaVersion | PIN/STROKE/TEXT; FK al documento; payload JSON v1 validado y separado del HTML. TEXT guarda ancla, texto original completo y sustitución. |
 | ViewerPreference | documentId, zoom, scrollY, speed, direction, pagePath? | Preferencia por documento, sin reanudar autoscroll por sorpresa. |
 | FlowNode | id, documentId, title, body, x, y, collapsed, createdAt, updatedAt, deletedAt? | Punto de un documento `FLOW`; coordenadas de mundo en dp; título o cuerpo no vacío; borrado lógico (tombstone) para sincronización futura. |
+| Document `MERMAID` | Código en `documents/<id>/mermaid/source.mmd` | Hasta 300 000 caracteres; `AtomicFile`; sin tablas nuevas. |
 | FlowEdge | id, documentId, fromId, toId, createdAt, updatedAt, deletedAt? | Conexión dirigida padre → hijo; sin duplicados, autoconexiones ni ciclos (validado en el repositorio). |
 
 Las anclas se embeben en el payload PIN; no hay tabla Anchor separada. El Markdown autoritativo reside en un archivo `.md`, no en una segunda copia editable en Room. Esta concreción mantiene el modelo indicativo del diseño sin duplicar autoridades.
@@ -208,3 +211,9 @@ Implementa la [propuesta autorizada](docs/proposals/ui-redesign.md) (fases R0–
 - **Flow (`flow/`)**: `FlowScreen` orquesta; `FlowCanvas` conserva los gestos de Flow Dots y dibuja puntos con foto (recorte circular desde `ImageBitmap`), contador amarillo y puntos simples por debajo de zoom 0,45; `FlowDotSheet` (nota o vista previa de una relación), `FlowRadialMenu` (geometría pura en `RadialLayout`), `FlowAvatarSheet`. El hit-test usa radio por punto (`FlowGraph.nearestWithin`).
 - **Navegación**: `LibraryViewModel.open(id, from)` mantiene una pila corta de retorno; abrir un documento o carpeta desde un punto vuelve al Flow con Atrás. La biblioteca marca `lastOpenedAt` para «Continuar».
 - **Lector, Markdown, navegador y GitHub**: sólo piel. El protocolo, la cruceta, el gesto de Pin y las políticas de WebView no cambian. Markdown pasa la barra de formato abajo (sobre el teclado) y conserva Fuente como autoridad.
+
+## Diagramas Mermaid (2026-11-18)
+
+[Propuesta y decisiones](docs/proposals/mermaid.md). `MainActivity` abre `MermaidScreen` para documentos `MERMAID`. El código es la autoridad (`MermaidViewModel`, autosave como Markdown); el dibujo es derivado. Un WebView propio (`https://mermaid.hypermarker.invalid`, sólo `assets/mermaid/`, sin red, CSP `default-src 'none'`) ejecuta `mermaid.min.js` sin modificar y el visor `viewer.js`, que incrusta la fuente Recursive. Android llama a `renderDiagram`, `requestGraph` y `exportDiagram`; las respuestas vuelven por `MermaidBridge` (origen exacto, frame principal, sesión aleatoria) en fragmentos que `ChunkAssembler` une con límites por tipo.
+
+Convertir: el visor entrega la estructura del parser de Mermaid y los centros del layout; `MermaidFlow.plan` (puro, JVM) genera puntos y conexiones sin ciclos, anotando en los puntos lo que Flow no puede representar; `LibraryRepository.copyMermaidToFlow` escribe la copia en una transacción, en un Flow nuevo o a la derecha de uno existente con un punto de cabecera. No se crea ninguna relación entre el Flow y el diagrama. Exportar SVG serializa el SVG con fuente y fondo; PNG lo rasteriza en un canvas (etiquetas SVG, sin `foreignObject`, para no contaminarlo) y el host escribe los bytes en el URI de SAF elegido. La miniatura de la biblioteca reutiliza `PreviewStore.captureView`.

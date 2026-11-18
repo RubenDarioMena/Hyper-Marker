@@ -6,6 +6,9 @@ import android.util.AtomicFile
 import androidx.room.Room
 import androidx.room.withTransaction
 import com.hypermarker.flow.FlowGraph
+import com.hypermarker.mermaid.FlowPlan
+import com.hypermarker.mermaid.MermaidFlow
+import com.hypermarker.mermaid.MermaidGraph
 import com.hypermarker.security.FolderRules
 import com.hypermarker.security.PathGuard
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +20,9 @@ import java.util.UUID
 
 const val MAX_FLOW_LINKS = 64
 const val FORM_BUFFER_LIMIT = 4_000_000
+/** Igual que `maxTextSize` del visor (`web/src/mermaid-viewer.js`). */
+const val MERMAID_MAX_CHARS = 300_000
+const val MERMAID_TEMPLATE = "flowchart TB\n    idea[\"Idea\"] --> plan[\"Plan\"]\n    plan --> hecho[\"Hecho\"]\n"
 
 class LibraryRepository(val context: Context, database: LibraryDatabase? = null) {
     val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
@@ -128,23 +134,68 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         try { stream.write(value.toByteArray()); atomic.finishWrite(stream) }
         catch (error: Throwable) { atomic.failWrite(stream); throw error }
     }
-    suspend fun importMarkdown(uri: Uri, parent: String?): Document {
-        val source = withContext(Dispatchers.IO) {
-            context.contentResolver.openInputStream(uri).use { input ->
-                val stream = requireNotNull(input)
-                val output = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(8192)
-                while (true) {
-                    val count = stream.read(buffer)
-                    if (count < 0) break
-                    require(output.size() + count <= 2 * 1024 * 1024) { "La nota supera 2 MiB" }
-                    output.write(buffer, 0, count)
-                }
-                val bytes = output.toByteArray()
-                require(bytes.size <= 2 * 1024 * 1024) { "La nota supera 2 MiB" }; bytes.toString(Charsets.UTF_8)
+    private suspend fun readLimited(uri: Uri, maxBytes: Int, tooLarge: String): String = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri).use { input ->
+            val stream = requireNotNull(input)
+            val output = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = stream.read(buffer)
+                if (count < 0) break
+                require(output.size() + count <= maxBytes) { tooLarge }
+                output.write(buffer, 0, count)
             }
+            output.toByteArray().toString(Charsets.UTF_8)
         }
-        return createMarkdown(parent, importer.displayName(uri).substringBeforeLast('.'), source)
+    }
+    suspend fun importMarkdown(uri: Uri, parent: String?): Document =
+        createMarkdown(parent, importer.displayName(uri).substringBeforeLast('.'), readLimited(uri, 2 * 1024 * 1024, "La nota supera 2 MiB"))
+
+    // ---- Diagramas Mermaid: el código es la autoridad; el dibujo se genera en el visor local ----
+
+    private fun mermaidSource(id: String) = File(directory(id), "mermaid/source.mmd")
+    private fun mermaidText(source: String) = source.also { require(it.length <= MERMAID_MAX_CHARS) { "El diagrama supera $MERMAID_MAX_CHARS caracteres" } }
+    suspend fun createMermaid(parent: String?, title: String, source: String = MERMAID_TEMPLATE): Document = write {
+        checkParent(parent)
+        val document = Document(id(), parent, name(title), "MERMAID")
+        try { atomicWrite(mermaidSource(document.id), mermaidText(source)); dao.put(document); document }
+        catch (error: Throwable) { directory(document.id).deleteRecursively(); throw error }
+    }
+    suspend fun readMermaid(id: String): String = withContext(Dispatchers.IO) {
+        require(dao.document(id)?.type == "MERMAID") { "El diagrama ya no existe" }
+        AtomicFile(mermaidSource(id)).readFully().toString(Charsets.UTF_8)
+    }
+    suspend fun saveMermaid(id: String, source: String) = write {
+        val doc = requireNotNull(dao.document(id)?.takeIf { it.type == "MERMAID" }) { "El diagrama ya no existe" }
+        atomicWrite(mermaidSource(id), mermaidText(source))
+        dao.put(doc.copy(updatedAt = System.currentTimeMillis(), revision = doc.revision + 1))
+    }
+    suspend fun importMermaid(uri: Uri, parent: String?): Document {
+        val source = readLimited(uri, MERMAID_MAX_CHARS * 4, "El diagrama supera $MERMAID_MAX_CHARS caracteres").removePrefix("\uFEFF")
+        return createMermaid(parent, importer.displayName(uri).substringBeforeLast('.'), source)
+    }
+    /**
+     * Copia (no enlaza) un flowchart en un Flow: uno nuevo en `parent` si `target` es null, o al lado derecho del
+     * contenido de un Flow existente, con un punto de cabecera para comparar varios diagramas. Todo o nada.
+     */
+    suspend fun copyMermaidToFlow(graph: MermaidGraph, target: String?, parent: String?, title: String, header: Pair<String, String>?): Pair<Document, FlowPlan> = write {
+        val document = if (target == null) { checkParent(parent); Document(id(), parent, name(title), "FLOW") } else flowDocument(target)
+        val existing = if (target == null) emptyList() else dao.flowNodes(target)
+        val plan = if (existing.isEmpty()) MermaidFlow.plan(graph, 0f, 0f, header.takeIf { target != null })
+            else MermaidFlow.plan(graph, coordinate(existing.maxOf { it.x } + 360f), coordinate(existing.minOf { it.y }), header)
+        require(existing.size + plan.nodes.size <= 5_000) { "El Flow admite hasta 5000 puntos" }
+        require(dao.flowEdges(document.id).size + plan.edges.size <= 20_000) { "El Flow admite hasta 20000 conexiones" }
+        val now = System.currentTimeMillis()
+        val nodes = plan.nodes.map { FlowNode(id(), document.id, it.title.trim(), it.body, coordinate(it.x), coordinate(it.y), createdAt = now, updatedAt = now, ringColor = it.ring) }
+        val edges = plan.edges.map { (from, to) -> FlowEdge(id(), document.id, nodes[from].id, nodes[to].id, createdAt = now, updatedAt = now) }
+        try {
+            if (target == null) require(directory(document.id).mkdirs()) { "No se pudo crear el documento" }
+            database.withTransaction {
+                if (target == null) dao.put(document) else dao.put(document.copy(updatedAt = now))
+                dao.putFlowNodes(nodes); dao.putFlowEdges(edges)
+            }
+        } catch (error: Throwable) { if (target == null) directory(document.id).deleteRecursively(); throw error }
+        document to plan
     }
     suspend fun finishImport(pending: PendingImport, entry: String, parent: String?): Document = write {
         checkParent(parent)

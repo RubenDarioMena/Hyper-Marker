@@ -6,7 +6,7 @@ enum class PickerMode { DESTINATION, RELATE, LIST }
 /** Filtro por tipo de los chips (Todo/HTML/Notas/Flow/Web). */
 enum class KindFilter(val label: String, val types: Set<String>) {
     ALL("Todo", emptySet()), HTML("HTML", setOf("HTML")), NOTES("Notas", setOf("MARKDOWN", "REMOTE_MARKDOWN")),
-    FLOW("Flow", setOf("FLOW")), WEB("Web", setOf("WEB_SNAPSHOT"));
+    FLOW("Flow", setOf("FLOW")), DIAGRAMS("Diagramas", setOf("MERMAID")), WEB("Web", setOf("WEB_SNAPSHOT"));
     fun accepts(type: String) = this == ALL || type in types
 }
 

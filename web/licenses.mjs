@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 const lock=JSON.parse(await readFile('package-lock.json','utf8'));
-let output='Hyper-Marker — componentes JavaScript distribuidos con el editor local\nGenerado con web/licenses.mjs. Versiones fijadas en package-lock.json.\n\n';
+let output='Hyper-Marker — componentes JavaScript distribuidos con el editor local y el visor de diagramas Mermaid\nGenerado con web/licenses.mjs. Versiones fijadas en package-lock.json.\n\n';
 for(const [location,item] of Object.entries(lock.packages).sort(([a],[b])=>a.localeCompare(b))){
   if(!location||item.dev)continue;
   const path=resolve(location),pkg=JSON.parse(await readFile(path+'/package.json','utf8'));

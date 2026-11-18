@@ -237,8 +237,8 @@ fun LibraryScreen(model: LibraryViewModel) {
     if (operation == "delete" && item != null) HmConfirm("¿Eliminar ${item.title}?",
         if (item.folder) "Se eliminarán esta carpeta, sus subcarpetas, documentos y anotaciones. Esta acción no se puede deshacer." else "Se eliminará el documento y sus anotaciones. Esta acción no se puede deshacer.",
         "Eliminar", { operation = null; model.delete(item.id, item.folder) }, { operation = null }, danger = true)
-    if (operation in listOf("folder", "markdown", "flow", "rename")) AlertDialog(onDismissRequest = { operation = null }, containerColor = hm.paper, shape = RoundedCornerShape(28.dp),
-        title = { Text(when (operation) { "rename" -> "Renombrar"; "folder" -> "Nueva carpeta"; "flow" -> "Nuevo Flow"; else -> "Nueva nota" }, style = MaterialTheme.typography.titleLarge) },
+    if (operation in listOf("folder", "markdown", "flow", "mermaid", "rename")) AlertDialog(onDismissRequest = { operation = null }, containerColor = hm.paper, shape = RoundedCornerShape(28.dp),
+        title = { Text(when (operation) { "rename" -> "Renombrar"; "folder" -> "Nueva carpeta"; "flow" -> "Nuevo Flow"; "mermaid" -> "Nuevo diagrama Mermaid"; else -> "Nueva nota" }, style = MaterialTheme.typography.titleLarge) },
         text = { OutlinedTextField(title, { title = it }, label = { Text("Nombre") }, singleLine = true) },
         confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
             val action = operation; val target = selected; operation = null
@@ -246,6 +246,7 @@ fun LibraryScreen(model: LibraryViewModel) {
                 "folder" -> model.repository.createFolder(model.folderId, title)
                 "markdown" -> model.open(model.repository.createMarkdown(model.folderId, title).id)
                 "flow" -> model.open(model.repository.createFlow(model.folderId, title).id)
+                "mermaid" -> model.open(model.repository.createMermaid(model.folderId, title).id)
                 "rename" -> model.repository.rename(target!!.id, target.folder, title)
             } }
         }) { Text(if (operation == "rename") "Guardar" else "Crear", color = hm.accent, fontWeight = FontWeight.SemiBold) } },

@@ -22,6 +22,7 @@ La carpeta [fixtures/](../fixtures/README.md) contiene ejemplos sintéticos, ZIP
 | `surface/` | Canvas/PixiJS o WebGL compatible y SVG; comprobar fallback de superficie. |
 | `dynamic/` | Elementos que cambian, desaparecen, reutilizan IDs o se duplican; reflow, transformaciones e iframe. |
 | `markdown/` | Corpus de headings/listas/emphasis/links/código y construcciones no compatibles para round-trip. |
+| `mermaid/` | Diagrama flowchart de referencia del propietario (subgrafos, ramas que convergen). |
 | `malicious/` | Generador controlado de ZIP traversal, absolutos, symlinks, colisiones y exceso de límites; payloads bridge inválidos y solicitudes entre documentos. |
 
 No almacenar bombas ZIP reales de gran tamaño: generar casos acotados usando límites inyectables para las pruebas. La generación de fixtures maliciosos no debe escribir fuera de su directorio temporal.
@@ -184,3 +185,20 @@ Desde este cambio SEC-03 se prueba con B revocado explícitamente: el default de
 | UX-04 | Enlace `raw.githack.com` u otro sitio con verificación Cloudflare en el navegador | Mensaje de verificación, la página avanza sola; cookies borradas al salir; «Abrir en otra aplicación» disponible. Manual en teléfono. |
 | UX-05 | HTML con input, textarea, select, radio, checkbox y contenteditable: escribir y girar el teléfono | Valores intactos (la Activity no se recrea). Manual en teléfono. |
 | UX-06 | Lo mismo y después Recargar, cambiar «Permitir recursos HTTPS», cerrar y reabrir el documento | Valores restaurados desde el respaldo; contraseñas nunca guardadas; campos tardíos restaurados; «Borrar respaldo de formularios» limpia (web `form fields are buffered…`, JVM `formStateIsAccepted…`). |
+
+## Diagramas Mermaid (2026-11-18)
+
+Función adicional ([propuesta](proposals/mermaid.md)). «JVM» = `MermaidFlowTest`; «web» = `web/tests/mermaid.test.mjs` (Chromium con la CSP de la página). El resto requiere dispositivo.
+
+| ID | Escenario | Resultado esperado |
+|---|---|---|
+| MMD-01 | Nuevo → Diagrama; importar `fixtures/mermaid/generador-gravitacional.mmd` por Archivos y por Compartir | Documento `MERMAID` con icono propio; abre en Diagrama con el aspecto neo, la fuente Recursive y sin cortes a mitad de palabra; nada de red (web `renders the reference…`). |
+| MMD-02 | Editar en Código, cambiar de pestaña, salir y reabrir; deshacer/rehacer | Código guardado (JVM `repositoryStores…`); el diagrama se actualiza ~0,35 s después de dejar de escribir; la miniatura de la biblioteca es la captura del visor. |
+| MMD-03 | Escribir código inválido | Mensaje del parser en Código y sobre el diagrama; el último diagrama válido sigue visible, atenuado (web `invalid code…`). |
+| MMD-04 | Flow nuevo desde la referencia | 21 puntos y 25 conexiones, mismo orden vertical y ramas a izquierda/derecha, colores por subgrafo, «Grupo: …» en el cuerpo, sin relación con el diagrama (JVM `referenceDiagram…`, `repositoryStores…`). Abrir Flow y volver con Atrás. Visual en dispositivo. |
+| MMD-05 | Añadir la referencia dos veces al mismo Flow | Segunda copia a la derecha con punto de cabecera amarillo; las copias no comparten puntos (JVM). |
+| MMD-06 | Diagrama con ciclo, etiquetas de flecha, aristas repetidas, autoconexión y `~~~` | Ninguna conexión crea ciclo; cada caso queda anotado en el punto y en el resumen (JVM `cyclesAreNever…`). |
+| MMD-07 | Diagrama de secuencia → Flow nuevo | Se dibuja y exporta; la conversión responde que ese tipo aún no se convierte, sin crear nada (web/JVM). |
+| MMD-08 | Exportar SVG y abrirlo en otra app (navegador, Inkscape) | Mismo dibujo con fuente incrustada y fondo blanco, sin `foreignObject` (web `exports a standalone SVG…`). SAF real en dispositivo. |
+| MMD-09 | Exportar PNG 2×/3×/4× | Dimensiones anunciadas = dimensiones del archivo; diagramas enormes reducidos a ≤ 8192 px/lado y ≤ 40 MP (web, JVM `pngSizeMatches…`). Memoria en dispositivo. |
+| MMD-10 | Etiquetas hostiles, `click … call`, `javascript:`, `%%{init: securityLevel loose}%%` | Sin ejecución ni carga remota (web `hostile labels…`); el bridge rechaza fragmentos desordenados o grandes (JVM `chunksMustArrive…`). |

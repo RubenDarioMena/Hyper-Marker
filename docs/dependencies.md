@@ -21,6 +21,8 @@ La implementación inicial usa un módulo `app`, namespace/applicationId `com.hy
 | Space Grotesk (variable, `wght`) | Google Fonts, `ofl/spacegrotesk`, SHA-256 `acad6de1…f79f72` | Títulos del rediseño. `res/font/space_grotesk_variable.ttf`. SIL OFL 1.1, `assets/licenses/SpaceGrotesk-OFL.txt`. |
 | Apache Commons Compress | 1.28.0 | ZIP con atributos Unix, rechazo de symlinks y control de entradas. Apache-2.0 y avisos incluidos. |
 | Milkdown Crepe / kit / utils | 7.22.3 | Editor visual Markdown local basado en ProseMirror; `kit` aporta los comandos de formato usados por la barra superior. MIT; dependencias transitivas y textos completos en `assets/licenses/WEB.txt`. |
+| Mermaid | 12.3.0 | Dibujo local de diagramas (`assets/mermaid/mermaid.min.js`, copia sin cambios del paquete npm). Incluye todos los tipos de diagrama: ~5,5 MB sin comprimir en el APK. MIT; dependencias transitivas (d3, dagre, cytoscape, KaTeX, DOMPurify…) y textos en `assets/licenses/WEB.txt`. |
+| Recursive (`@fontsource/recursive`) | 5.3.0, peso 400, subconjuntos latin y latin-ext | Fuente de los diagramas, igual a la referencia del propietario; incrustada como `data:` en el visor y en los SVG exportados (≈44 KB). SIL OFL 1.1, texto en `WEB.txt`. |
 | esbuild | 0.28.2 | Genera el bundle local del editor. MIT, herramienta de desarrollo. |
 | Compose UI Test JUnit4 / ui-test-manifest | BOM 2025.04.01 (1.8.0) | Sólo pruebas: capturas del rediseño con Robolectric en gráficos nativos (`RedesignScreenshotTest`). No entra en el APK release; `ui-test-manifest` sólo en debug. Apache-2.0. |
 | JUnit / Robolectric | 4.13.2 / 4.14.1 | Tests JVM y Room/JSON Android; EPL-1.0 / MIT, herramientas de prueba. |

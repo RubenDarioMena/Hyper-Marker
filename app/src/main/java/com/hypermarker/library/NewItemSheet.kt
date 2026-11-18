@@ -32,9 +32,10 @@ fun NewItemSheet(folderName: String?, onDismiss: () -> Unit, onCreate: (String) 
                 CreateCard(Icons.Outlined.Folder, "Carpeta", Modifier.weight(1f)) { onCreate("folder") }
                 CreateCard(Icons.Outlined.Description, "Nota", Modifier.weight(1f)) { onCreate("markdown") }
                 CreateCard(Icons.Outlined.Hub, "Flow", Modifier.weight(1f)) { onCreate("flow") }
+                CreateCard(Icons.Outlined.AccountTree, "Diagrama", Modifier.weight(1f)) { onCreate("mermaid") }
             }
             SectionLabel("Importar del teléfono", Modifier.padding(top = 20.dp))
-            HmRow("Archivos", "HTML, ZIP o Markdown", leading = { Icon(Icons.Outlined.FileUpload, null, tint = hm.ink) }, onClick = onImportFiles)
+            HmRow("Archivos", "HTML, ZIP, Markdown o Mermaid (.mmd)", leading = { Icon(Icons.Outlined.FileUpload, null, tint = hm.ink) }, onClick = onImportFiles)
             HmDivider()
             HmRow("Carpeta HTML", "Un proyecto completo con sus recursos", leading = { Icon(Icons.Outlined.DriveFolderUpload, null, tint = hm.ink) }, onClick = onImportTree)
             SectionLabel("Traer de internet", Modifier.padding(top = 16.dp))

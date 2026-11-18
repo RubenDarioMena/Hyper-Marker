@@ -259,3 +259,22 @@ Siguiente paso concreto:
 ## Actualización de Samsung S24 Ultra SM-S928U con rediseño + legibilidad (2026-11-16)
 
 - Por indicación del propietario, **instalación directa sin respaldo previo**. Instalación anterior del 2026-11-15 23:55. `adb install -r artifacts/Hyper-Marker-redesign-main-debug.apk`: **Success**; APK instalado con SHA-256 `4f6fe339…a74b` (coincide). `MainActivity` en primer plano, proceso activo, sin fallos de `com.hypermarker` en el buffer de crash de hoy. Sin pruebas instrumentadas ni recorrido manual.
+
+## Diagramas Mermaid: leer, guardar, convertir en Flow y exportar (2026-11-18)
+
+- Fuente: rama `claude/focused-einstein-sgg0ra` sobre `ad2a1d6`, árbol limpio al comenzar. Especificación original intacta. Contenedor Linux cloud, JDK 21, Android SDK 36 / Build Tools 35 instalados en esta sesión con `sdkmanager`.
+- **Pedido explícito del propietario**: leer y guardar diagramas Mermaid, convertirlos en un Flow nuevo o añadirlos a uno existente para compararlos; la copia no se enlaza al archivo Mermaid. Después pidió exportar a SVG y PNG de alta resolución. La referencia visual es su diagrama «Generador gravitacional» (aspecto *neo*). Decisiones, límites y pendientes en [docs/proposals/mermaid.md](docs/proposals/mermaid.md).
+- Implementado:
+  - Tipo `MERMAID` sin migración de Room. Código en `documents/<id>/mermaid/source.mmd` con `AtomicFile`, hasta 300 000 caracteres. «Nuevo → Diagrama» con plantilla, importación `.mmd`/`.mermaid`, chip «Diagramas», icono y dibujo propios, miniatura capturada al cerrar. Duplicar y borrar usan los flujos existentes.
+  - `MermaidScreen`: pestañas Diagrama/Código, autosave, deshacer/rehacer, error del parser conservando el último dibujo válido, zoom con dos dedos. Barra con Flow nuevo, Añadir a Flow, SVG y PNG (2×/3×/4× con dimensiones visibles, ≤ 8192 px/lado y ≤ 40 MP).
+  - Visor local `assets/mermaid/`: Mermaid 12.3.0 sin cambios, `theme: redux-color` + `look: neo`, fuente Recursive incrustada (OFL), etiquetas SVG (sin `foreignObject`) y `wrappingWidth` 180. WebView propio sin red, con CSP y bridge de origen exacto con fragmentos.
+  - Conversión: el parser de Mermaid y su layout → `MermaidFlow.plan` (puro) → `copyMermaidToFlow` (transacción). Colores por subgrafo, «Grupo: …», ciclos/etiquetas/duplicados/autoconexiones anotados en los puntos y en el resumen. Añadir a un Flow coloca la copia a la derecha con un punto de cabecera. Sin enlaces al diagrama.
+  - Los puntos sin foto de Flow se pintan con `ringColor` si lo tienen. Un punto al que se le quitó la foto conserva el color elegido.
+- Validación de esta sesión:
+  - `./gradlew testDebugUnitTest` **102/102 PASS**, sin omisiones; nuevos: `MermaidFlowTest` (9), con el grafo real extraído por el visor de la referencia.
+  - `lintDebug` **0 errores, 65 advertencias** (igual que antes; ninguna en `mermaid/`). `assembleDebug` y `assembleDebugAndroidTest` **PASS**.
+  - Web `npm test` **24/24 PASS** (Chrome `CHROME_PATH`), incluidos 5 nuevos en `mermaid.test.mjs`: render bajo CSP sin peticiones remotas, extracción de 21 nodos/25 aristas/2 subgrafos, SVG autónomo y PNG 3× con dimensiones exactas, error de sintaxis y etiquetas/directivas hostiles.
+  - Revisión visual del PNG exportado frente a la referencia: misma estructura, colores de subgrafos, saltos en cruces y fuente.
+- APK local `app/build/outputs/apk/debug/app-debug.apk` (no versionado), SHA-256 `102d4d6a20476b16c76ff87fa1c139fd329d38d75dbfd981762a9412425137e8`, 25,0 MB (+5,5 MB sin comprimir por `mermaid.min.js`). Firmado con la clave debug de este entorno: **no** coincide con las instalaciones del S24/Tab.
+- **No verificado**: nada en dispositivo ni emulador (sin KVM). Pendientes: WebView real de Android, zoom táctil, SAF de exportación, captura de miniatura, aspecto de la pantalla en el teléfono, rendimiento con diagramas grandes, MMD-01…10 manuales de [docs/testing.md](docs/testing.md).
+- Siguiente paso concreto: compilar en la Mac con la firma `42909c43…`, instalar en el S24 tras respaldo y recorrer MMD-01…10 con el diagrama de referencia; el propietario decide las preguntas 1–4 de la propuesta y, si quiere, genera capturas de las muestras incluidas allí para afinar el aspecto.

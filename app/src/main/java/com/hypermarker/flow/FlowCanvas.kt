@@ -257,7 +257,7 @@ internal fun FlowCanvas(model: FlowViewModel, nodes: List<FlowNode>, size: IntSi
                 if (node.collapsed) {
                     drawCircle(FlowInk.raised, r, p)
                     drawCircle(FlowInk.mint, r, p, style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f, 6f))))
-                } else drawCircle(if (isSelected) FlowInk.pin else FlowInk.mint, r, p)
+                } else drawCircle(if (isSelected) FlowInk.pin else node.ringColor?.let { Color(it.toInt()) } ?: FlowInk.mint, r, p)
             }
             if (model.rearrange) drawCircle(FlowInk.text.copy(alpha = .4f), r + 8.dp.toPx(), p, style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))))
             val related = linkMap[node.id].orEmpty().size

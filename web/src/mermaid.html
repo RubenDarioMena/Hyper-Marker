@@ -1,0 +1,13 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=0.2,maximum-scale=8,user-scalable=yes">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<style>
+html,body{margin:0;background:#fff;color:#14201c;font-family:"Recursive Variable",system-ui,sans-serif}
+#diagram{padding:24px 16px 120px;box-sizing:border-box;min-height:100vh;display:flex;justify-content:center;align-items:flex-start}
+#diagram svg{display:block;height:auto;max-width:100%}
+#error{display:none;margin:24px 16px;padding:14px 16px;border-radius:12px;background:#fdecea;color:#8a1c12;white-space:pre-wrap;font:14px/1.45 ui-monospace,'Roboto Mono',monospace}
+body.failed #error{display:block}
+body.failed.stale #diagram{opacity:.35}
+</style></head>
+<body><div id="error" role="alert"></div><div id="diagram" aria-live="polite"></div>
+<script src="mermaid.min.js"></script><script src="viewer.js"></script></body></html>

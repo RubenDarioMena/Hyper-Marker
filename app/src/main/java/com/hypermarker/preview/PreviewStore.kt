@@ -74,9 +74,9 @@ class PreviewStore(private val repository: LibraryRepository) {
         return File(root, fileName(document.id, signature)).takeIf { it.isFile }
     }
 
-    /** Captura de lo visible en el lector al cerrarlo. Se llama en el hilo principal con la vista aún adjunta. */
+    /** Captura de lo visible en el lector (o en el visor de un diagrama) al cerrarlo. Se llama en el hilo principal con la vista aún adjunta. */
     fun captureView(document: Document, view: View) {
-        if (view.width <= 0 || view.height <= 0 || document.type !in listOf("HTML", "WEB_SNAPSHOT")) return
+        if (view.width <= 0 || view.height <= 0 || document.type !in listOf("HTML", "WEB_SNAPSHOT", "MERMAID")) return
         val scale = WIDTH.toFloat() / view.width
         val height = min((view.height * scale).toInt(), (WIDTH * 1.5f).toInt()).coerceAtLeast(1)
         val bitmap = runCatching {
@@ -112,7 +112,7 @@ class PreviewStore(private val repository: LibraryRepository) {
         "MARKDOWN" -> "v${document.revision}-${document.updatedAt}"
         "REMOTE_MARKDOWN" -> "v${document.revision}-${(document.entryPath ?: "").hashCode().toUInt()}"
         "FLOW" -> "f" + flowSignature(repository.dao.flowNodes(document.id), repository.dao.flowEdges(document.id))
-        "HTML", "WEB_SNAPSHOT" -> "capture".takeIf { File(root, fileName(document.id, "capture")).isFile }
+        "HTML", "WEB_SNAPSHOT", "MERMAID" -> "capture".takeIf { File(root, fileName(document.id, "capture")).isFile }
         else -> null
     }
 

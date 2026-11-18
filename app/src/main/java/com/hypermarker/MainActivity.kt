@@ -16,6 +16,7 @@ import com.hypermarker.github.RemoteMarkdownScreen
 import com.hypermarker.library.LibraryScreen
 import com.hypermarker.library.LibraryViewModel
 import com.hypermarker.markdown.MarkdownScreen
+import com.hypermarker.mermaid.MermaidScreen
 import com.hypermarker.viewer.ReaderScreen
 import com.hypermarker.ui.theme.HyperMarkerTheme
 
@@ -40,6 +41,8 @@ class MainActivity : ComponentActivity() {
                         (document?.type == "HTML" || document?.type == "WEB_SNAPSHOT") -> ReaderScreen(requireNotNull(document), model.repository, onClose = model::closeDocument, onBrowse = model::browse,
                             onMarkdown = { model.action { model.open(model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id) } })
                         document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = model::closeDocument)
+                        document?.type == "MERMAID" -> MermaidScreen(document, model.repository, model.previews, onClose = model::closeDocument,
+                            onOpen = { id -> model.open(id, from = document.id) })
                         document?.type == "FLOW" -> FlowScreen(document, model.repository, model.previews, onClose = model::closeDocument,
                             onOpen = { id -> model.open(id, from = document.id) },
                             onOpenFolder = { id -> model.openFolder(id, from = document.id) })
