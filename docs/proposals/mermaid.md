@@ -53,16 +53,61 @@ Al terminar, un diálogo resume puntos, conexiones y cada categoría anterior, c
 - APK +5,5 MB sin comprimir por `mermaid.min.js` (incluye todos los tipos de diagrama).
 - El zoom es el del WebView (pellizco); no hay panel de minimapa ni ajuste automático en diagramas muy anchos.
 - El editor de código no resalta sintaxis ni autocompleta. Los errores muestran el mensaje del parser, sin marcar la línea en el editor.
-- No se leen bloques ` ```mermaid ` dentro de notas Markdown; sería un paso posterior.
+- En notas Markdown, la vista previa de bloques mermaid sólo existe en Visual; en Fuente se ve el código.
 - No se probó todavía en dispositivo: WebView de Android real, zoom táctil, SAF, captura de miniatura ni rendimiento con diagramas de cientos de nodos.
 
-## Pendiente de decisión del propietario
+## Decisiones del propietario (2026-11-18)
 
-1. ¿Leer y dibujar bloques ` ```mermaid ` dentro de las notas Markdown (con «Abrir como diagrama»)?
-2. ¿Convertir también diagramas de estados (`stateDiagram`) y mapas mentales (`mindmap`) en Flow?
-3. ¿Volver del Flow al código (exportar un Flow a Mermaid)? Hoy la copia sólo va de Mermaid a Flow.
-4. ¿Más referencias visuales? Ver «Muestras para pedir referencias» abajo.
+1. **Bloques ` ```mermaid ` en notas Markdown: sí.** Implementado (ver abajo).
+2. **Estados y mapas mentales → Flow: pendiente, con evaluación.** Se dibujan y exportan desde ya; la conversión queda anotada (evaluación abajo).
+3. **Flow → Mermaid: sí**, sobre todo para exportar SVG/PNG, compartir la idea general de un sistema o imprimirlo para anotar. Implementado (ver abajo).
+4. **Referencias:** entregadas en SVG y PNG. Los SVG están en [`docs/design/mermaid/`](../design/mermaid/) y los códigos en `fixtures/mermaid/muestra-*.mmd`.
 
+## Bloques mermaid dentro de notas Markdown
+
+- En **Visual**, cada bloque ` ```mermaid ` (o ` ```mmd `) se muestra como diagrama con el mismo estilo del visor. «Editar código» despliega el código del bloque y «Solo diagrama» lo vuelve a ocultar (vista previa de bloques de código de Milkdown). **Fuente** sigue mostrando el texto tal cual; el Markdown guardado no cambia.
+- Mermaid (5,5 MB) se carga **sólo** si la nota tiene un bloque de ese tipo. Usa el mismo asset y la misma configuración que el visor (`web/src/mermaid-config.js`).
+- «Abrir como diagrama», bajo cada diagrama, guarda la nota y crea un documento Mermaid **copiado** del bloque («Diagrama · <nota>», misma carpeta). Desde él se convierte a Flow o se exporta. Atrás vuelve a la nota. En la vista de solo lectura de GitHub el botón no aparece.
+- Un bloque con errores muestra el mensaje del parser en lugar del diagrama. Milkdown sanea la vista previa con DOMPurify además del modo `strict` de Mermaid; el botón se atiende por delegación, porque el saneado elimina manejadores.
+
+## Flow → Mermaid
+
+- Botón de diagrama en la cabecera del Flow → «Crear diagrama Mermaid». Crea un documento Mermaid **copiado** del Flow, en su carpeta, y lo abre. El Flow no cambia y no queda enlazado.
+- Cada punto es una caja con el título y hasta dos líneas de su nota (80 caracteres por línea). El orden es de arriba abajo y de izquierda a derecha. Mermaid recalcula la disposición: las posiciones manuales del Flow no se conservan.
+- Deshace las anotaciones de la conversión Mermaid→Flow para que ida y vuelta no pierdan estructura: «Grupo: X» vuelve a ser subgrafo; «← Padre: texto» vuelve a ser la etiqueta de esa flecha; «→ Destino (conexión omitida: crearía un ciclo)» vuelve como flecha punteada; «↻ Se conecta consigo mismo» vuelve como autoconexión. Una anotación que no corresponde a ningún punto queda como texto.
+- Los puntos con color y sin grupo conservan el color en el borde (`style … stroke`). Fotos y relaciones no se copian.
+- Límite: 4000 conexiones (el `maxEdges` del visor). El texto se escapa con entidades de Mermaid (`#quot;`, `#35;`, `#124;`…).
+- Corrección encontrada al probarlo: el parser de Mermaid guarda esas entidades con marcadores internos (`ﬂ°…¶ß`). El extractor ahora los devuelve como entidades HTML y Kotlin las decodifica, así que una etiqueta con comillas o `#` ya no llega rota a Flow.
+
+## Referencias visuales del propietario: hallazgos
+
+Las cuatro muestras se dibujan como en las referencias: formas (estadio, rombo, subrutina, cilindro, bandera, círculo), flechas gruesa y punteada, `classDef`, subgrafos anidados con colores distintos, estados con inicio y fin, y mapa mental con ramas de color. Diferencias corregidas:
+
+- **Estados con texto alineado a la izquierda.** Con etiquetas SVG, Mermaid reserva el ancho mínimo del estado pero dibuja el texto desde la izquierda. `polish()` recentra cada etiqueta en su caja (visor y notas).
+- **Fondo de las etiquetas de flecha.** En estados quedaba blanco al 50 % (una regla CSS más específica); ahora es gris sólido `#cccccc`, como en las referencias.
+
+Diferencia aceptada: las referencias usan etiquetas HTML y parten «¿Recursos suficientes?» o «Construir módulo» en dos líneas. Aquí, con `wrappingWidth` 180, caben en una. Se mantienen las etiquetas SVG porque el PNG las necesita (las HTML contaminan el canvas) y el SVG exportado se abre en más editores.
+
+## Evaluación: estados y mapas mentales → Flow (pendiente)
+
+Comprobado en el parser incluido: ambos tipos exponen `db.getData()` con la misma forma (nodos con `label`, `parentId` e `isGroup`; aristas con `start`, `end` y `label`). La extracción sería genérica y reutilizaría `MermaidFlow.plan`.
+
+| Tipo | Complejidad | Utilidad inmediata | Comentario |
+| --- | --- | --- | --- |
+| Mapa mental | Baja (≈ medio día con pruebas) | **Alta** para planear: lluvia de ideas → puntos de Flow para luego relacionar documentos y fotos. | Es un árbol: encaja sin pérdidas en Flow (sin ciclos). Las posiciones radiales de Mermaid se pueden conservar. |
+| Estados | Baja–media (≈ 1 día) | Media-baja | Las máquinas de estados suelen ser cíclicas (Activo → Inactivo): varias transiciones quedarían como anotaciones. Hay que traducir los pseudoestados inicio/fin y los estados compuestos (grupos). |
+
+Recomendación: cuando se retome, empezar por mapas mentales. Los estados aportan poco mientras Flow no admita ciclos.
+
+## Evaluación: texto en medio de las flechas de Flow (pregunta del 2026-11-18)
+
+Viable y de alcance acotado (≈ 1–1,5 días con pruebas), recomendado:
+
+- **Datos:** columna `label` en `flow_edges` (Room v5, migración `ALTER TABLE … ADD COLUMN`, sin reescribir filas). Hay que respaldar el S24/Tab antes de instalar, como en v2–v4.
+- **Dibujo:** el texto en una píldora en el punto medio de la curva (`FlowCanvas` ya calcula la curva y la flecha). Se oculta por debajo del zoom de detalle, igual que los títulos.
+- **Edición:** hoy las flechas no se pueden tocar. Propuesta: tocar cerca del punto medio abre «Texto de la conexión» (editar o quitar). Alternativa accesible en la tarjeta del punto, donde ya se listan las conexiones para quitarlas.
+- **Mermaid:** las etiquetas pasarían directamente a la conexión en vez de anotarse en el cuerpo del destino, y Flow → Mermaid las exportaría como `-->|texto|`. Las anotaciones «← A: texto» de copias anteriores se podrían migrar a la etiqueta al editar.
+- **Riesgos:** etiquetas largas que tapan puntos (limitar a ~60 caracteres visibles con elipsis) y toques ambiguos entre flecha y punto (los puntos tienen prioridad).
 ## Muestras para pedir referencias
 
 Para afinar el aspecto con combinaciones que el diagrama de referencia no cubre, sirven las capturas de estos códigos desde el mismo editor que se usó para la referencia:

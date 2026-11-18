@@ -1,0 +1,12 @@
+flowchart TB
+    subgraph Fábrica
+      direction LR
+      subgraph Línea1["Línea 1"]
+        a1 --> a2
+      end
+      subgraph Línea2["Línea 2"]
+        b1 --> b2
+      end
+    end
+    Fábrica --> Almacén
+    a2 ~~~ b1

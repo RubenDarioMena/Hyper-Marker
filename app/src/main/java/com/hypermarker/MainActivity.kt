@@ -40,7 +40,8 @@ class MainActivity : ComponentActivity() {
                             onClose = model::closeDocument, onCopy = { model.open(it) })
                         (document?.type == "HTML" || document?.type == "WEB_SNAPSHOT") -> ReaderScreen(requireNotNull(document), model.repository, onClose = model::closeDocument, onBrowse = model::browse,
                             onMarkdown = { model.action { model.open(model.repository.createMarkdown(document.folderId, "Notas · ${document.title}").id) } })
-                        document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = model::closeDocument)
+                        document?.type == "MARKDOWN" -> MarkdownScreen(document, model.repository, onClose = model::closeDocument,
+                            onOpen = { id -> model.open(id, from = document.id) })
                         document?.type == "MERMAID" -> MermaidScreen(document, model.repository, model.previews, onClose = model::closeDocument,
                             onOpen = { id -> model.open(id, from = document.id) })
                         document?.type == "FLOW" -> FlowScreen(document, model.repository, model.previews, onClose = model::closeDocument,

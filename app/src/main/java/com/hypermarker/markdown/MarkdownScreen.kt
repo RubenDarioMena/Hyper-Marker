@@ -55,6 +55,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.webkit.*
 import com.hypermarker.storage.Document
 import com.hypermarker.storage.LibraryRepository
+import com.hypermarker.storage.MERMAID_MAX_CHARS
 import com.hypermarker.viewer.DocumentWebView
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -66,7 +67,7 @@ import java.util.UUID
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: () -> Unit) {
+fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: () -> Unit, onOpen: (String) -> Unit = {}) {
     val model: MarkdownViewModel = viewModel(key = "markdown-${document.id}", factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = MarkdownViewModel(document.id, repository) as T
     })
@@ -155,6 +156,15 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
         } else then()
     }
     fun close() { flushVisual { scope.launch { model.save(); if (model.saved) onClose() } } }
+    /** «Abrir como diagrama» en un bloque ```mermaid: guarda la nota y abre una copia del bloque como documento Mermaid. */
+    fun openDiagram(source: String) {
+        if (source.isBlank() || source.length > MERMAID_MAX_CHARS) return
+        flushVisual { scope.launch {
+            model.save()
+            runCatching { repository.createMermaid(document.folderId, "Diagrama · ${document.title}".take(200), source.trimEnd() + "\n") }
+                .onSuccess { onOpen(it.id) }.onFailure { model.error = it.message ?: "No se pudo crear el diagrama" }
+        } }
+    }
     fun applyStyle() { visualWeb?.evaluateJavascript("window.setEditorStyle?.(${JSONObject().put("dark", dark).put("font", font)})", null) }
     fun visualCommand(name: String, value: Any? = null) {
         val argument = when (value) { null -> "null"; is String -> JSONObject.quote(value); else -> value.toString() }
@@ -289,6 +299,7 @@ fun MarkdownScreen(document: Document, repository: LibraryRepository, onClose: (
                                     evaluateJavascript("window.editorSetScrollFraction?.($visualScrollFraction)", null)
                                 }
                                 "error" -> { model.error = data.getJSONObject("payload").optString("message"); model.visual = false }
+                                "mermaid.open" -> openDiagram(data.getJSONObject("payload").optString("source"))
                             }
                         }
                     }

@@ -1,0 +1,9 @@
+flowchart LR
+    start([Inicio]) --> check{¿Recursos suficientes?}
+    check -- sí --> build[[Construir módulo]]
+    check -- no --> mine[(Minar materiales)]
+    mine -.-> check
+    build ==> test>Prueba de carga]
+    test --> done((Listo))
+    classDef warn fill:#fff3cd,stroke:#e0a800
+    class mine warn

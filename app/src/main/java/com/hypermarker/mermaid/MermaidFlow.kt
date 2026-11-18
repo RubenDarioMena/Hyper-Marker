@@ -57,7 +57,7 @@ object MermaidFlow {
     /** Etiqueta Mermaid → líneas de texto plano: saltos `<br>`, sin HTML ni marcas de cadena Markdown, entidades decodificadas. */
     fun lines(label: String): List<String> {
         var value = label.replace(Regex("(?i)<br\\s*/?>"), "\n").replace(Regex("<[^>]{0,500}>"), "")
-        value = value.replace(Regex("#(\\d{1,7});")) { m -> m.groupValues[1].toInt().takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: "" }
+        value = value.replace(Regex("(?<!&)#(\\d{1,7});")) { m -> m.groupValues[1].toInt().takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: "" }
         val named = mapOf("quot" to "\"", "amp" to "&", "lt" to "<", "gt" to ">", "nbsp" to " ", "apos" to "'")
         value = value.replace(Regex("[#&](quot|amp|lt|gt|nbsp|apos);")) { named.getValue(it.groupValues[1]) }
             .replace(Regex("&#(\\d{1,7});")) { m -> m.groupValues[1].toInt().takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: "" }

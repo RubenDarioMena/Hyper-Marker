@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.AddLink
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Hub
@@ -70,6 +71,7 @@ fun FlowScreen(document: Document, repository: LibraryRepository, previews: Prev
     var deleting by remember { mutableStateOf<String?>(null) }
     var managing by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf(true) }
+    var diagramming by remember { mutableStateOf(false) }
     val parents = remember(edges) { edges.map { it.fromId }.toSet() }
     val relateImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         val node = model.relating
@@ -116,6 +118,10 @@ fun FlowScreen(document: Document, repository: LibraryRepository, previews: Prev
             InkButton(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", onClick = onClose)
             Text(document.title, Modifier.weight(1f).padding(horizontal = 12.dp).semantics { heading() }, color = FlowInk.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp))
+            if (nodes.isNotEmpty()) {
+                InkButton(Icons.Outlined.AccountTree, "Crear diagrama Mermaid de este Flow", onClick = { diagramming = true })
+                Spacer(Modifier.width(8.dp))
+            }
             InkButton(Icons.Outlined.CenterFocusStrong, "Encuadrar todos los puntos", onClick = {
                 model.camera = FlowCamera.fit(nodes.map { model.position(it) }, size.width.toFloat(), size.height.toFloat(), density, 110 * density)
             })
@@ -190,6 +196,11 @@ fun FlowScreen(document: Document, repository: LibraryRepository, previews: Prev
             HmConfirm("¿Eliminar este punto?", "Se eliminarán el punto, su foto y sus conexiones y relaciones. Los puntos conectados y los documentos relacionados se conservan.",
                 "Eliminar", { deleting = null; model.delete(id) }, { deleting = null }, danger = true)
         }
+    }
+    if (diagramming) LightSheetTheme {
+        HmConfirm("Crear diagrama Mermaid", "Se crea un documento Mermaid nuevo con una copia de este Flow: títulos, hasta dos líneas de cada nota, conexiones, " +
+            "grupos y etiquetas de flecha que vinieron de Mermaid. Mermaid recalcula la disposición. Desde él puedes exportar SVG o PNG; el Flow no cambia.",
+            "Crear y abrir", { diagramming = false; model.toDiagram(onOpen) }, { diagramming = false })
     }
 }
 

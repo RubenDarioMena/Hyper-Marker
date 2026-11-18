@@ -1,0 +1,16 @@
+%% Copia del Flow «Prueba» generada por Hyper-Marker
+flowchart TB
+    n1["Inicio<br/>Arranque del sistema"]
+    n2["Medio #quot;quoted#quot; #lt;x#gt;<br/>Detalle 1<br/>Detalle 2"]
+    n4["Suelto"]
+
+    subgraph g1["Fase #35; 2"]
+        direction TB
+        n3["Fin"]
+    end
+
+    n1 -->|sí| n2
+    n2 --> n3
+    n3 -.->|reintentar| n1
+
+    style n4 stroke:#2dd4bf,stroke-width:2px

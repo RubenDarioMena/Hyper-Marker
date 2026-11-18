@@ -7,8 +7,59 @@ import { createCodeBlockCommand, insertHrCommand, liftListItemCommand, toggleEmp
 import { insertTableCommand, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
+import { CONFIG as MERMAID_CONFIG, installFont, polishText } from './mermaid-config.js';
 let crepe;
+let readOnlyMode = false;
 let session;
+const MERMAID_LANGUAGE = /^(mermaid|mmd)$/i;
+let mermaidReady = null;
+let mermaidRenders = 0;
+const diagrams = new Map();
+/** Carga Mermaid (5,5 MB) sólo cuando la nota contiene un bloque ```mermaid. Mismo asset y configuración que el visor. */
+function loadMermaid() {
+  if (!mermaidReady) mermaidReady = new Promise((done, fail) => {
+    const script = document.createElement('script');
+    script.src = '../mermaid/mermaid.min.js';
+    script.onload = () => { installFont(); window.mermaid.initialize(MERMAID_CONFIG); done(window.mermaid); };
+    script.onerror = () => { mermaidReady = null; fail(new Error('No se pudo cargar el visor de diagramas')); };
+    document.head.appendChild(script);
+  });
+  return mermaidReady;
+}
+function mermaidFailure(error) {
+  const box = document.createElement('div');
+  box.className = 'hm-mermaid-error';
+  box.textContent = 'El diagrama tiene errores: ' + String(error?.message || error || '').slice(0, 600);
+  return box;
+}
+/** Vista previa asíncrona: Milkdown sanea el resultado (DOMPurify) antes de insertarlo. */
+function mermaidPreview(content, apply) {
+  const source = String(content || '').trim();
+  if (!source) return null;
+  loadMermaid().then(async (mermaid) => {
+    const id = 'hm-md-' + (++mermaidRenders);
+    try {
+      const { svg } = await mermaid.render(id, source);
+      const key = String(mermaidRenders);
+      diagrams.set(key, source);
+      if (diagrams.size > 200) diagrams.delete(diagrams.keys().next().value);
+      apply('<div class="hm-mermaid">' + polishText(svg) + '</div>' + (readOnlyMode ? '' :
+        '<button type="button" class="hm-mermaid-open" data-hm-diagram="' + key + '">Abrir como diagrama</button>'));
+    } catch (error) {
+      document.getElementById(id)?.remove(); document.getElementById('d' + id)?.remove();
+      apply(mermaidFailure(error));
+    }
+  }, (error) => apply(mermaidFailure(error)));
+  return undefined;
+}
+// La vista previa se inserta como HTML saneado (sin manejadores): el botón se atiende por delegación.
+document.addEventListener('click', (event) => {
+  const button = event.target?.closest?.('[data-hm-diagram]');
+  if (!button) return;
+  event.preventDefault(); event.stopPropagation();
+  const source = diagrams.get(button.dataset.hmDiagram);
+  if (source && !readOnlyMode) send('mermaid.open', {source});
+}, true);
 const send = (type, payload) => window.MarkdownBridge?.postMessage(JSON.stringify({type, sessionId:session, payload}));
 window.startEditor = async (source, sessionId, readOnly = false) => {
   session = sessionId;
@@ -16,7 +67,13 @@ window.startEditor = async (source, sessionId, readOnly = false) => {
     if (crepe) await crepe.destroy();
     // La barra flotante se sustituye por la barra nativa superior, que actúa sobre la misma selección.
     crepe = new Crepe({root:document.getElementById('editor'), defaultValue:source,
-      features:{[Crepe.Feature.ImageBlock]:false, [Crepe.Feature.Latex]:false, [Crepe.Feature.Toolbar]:false, [Crepe.Feature.TopBar]:false, [Crepe.Feature.AI]:false}});
+      features:{[Crepe.Feature.ImageBlock]:false, [Crepe.Feature.Latex]:false, [Crepe.Feature.Toolbar]:false, [Crepe.Feature.TopBar]:false, [Crepe.Feature.AI]:false},
+      featureConfigs:{[Crepe.Feature.CodeMirror]:{
+        // Los bloques ```mermaid se dibujan bajo el código; el resto de bloques no tiene vista previa.
+        renderPreview:(language, content, apply) => MERMAID_LANGUAGE.test(language || '') ? mermaidPreview(content, apply) : null,
+        previewOnlyByDefault:true, previewLabel:'Diagrama', previewLoading:'Dibujando diagrama…',
+        previewToggleText:(previewOnly) => previewOnly ? 'Editar código' : 'Solo diagrama'}}});
+    readOnlyMode = readOnly;
     crepe.setReadonly(readOnly);
     crepe.on(listener => listener.markdownUpdated((_ctx, markdown) => send('change', {source:markdown})));
     await crepe.create();

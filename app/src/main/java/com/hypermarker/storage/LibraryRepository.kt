@@ -6,6 +6,7 @@ import android.util.AtomicFile
 import androidx.room.Room
 import androidx.room.withTransaction
 import com.hypermarker.flow.FlowGraph
+import com.hypermarker.mermaid.FlowMermaid
 import com.hypermarker.mermaid.FlowPlan
 import com.hypermarker.mermaid.MermaidFlow
 import com.hypermarker.mermaid.MermaidGraph
@@ -173,6 +174,14 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
     suspend fun importMermaid(uri: Uri, parent: String?): Document {
         val source = readLimited(uri, MERMAID_MAX_CHARS * 4, "El diagrama supera $MERMAID_MAX_CHARS caracteres").removePrefix("\uFEFF")
         return createMermaid(parent, importer.displayName(uri).substringBeforeLast('.'), source)
+    }
+    /** Flow → nuevo documento Mermaid (copia) junto al Flow, para compartirlo o exportarlo como SVG/PNG. */
+    suspend fun createMermaidFromFlow(flowId: String): Document {
+        val (flow, code) = withContext(Dispatchers.IO) {
+            val flow = flowDocument(flowId)
+            flow to FlowMermaid.generate(flow.title, dao.flowNodes(flowId), dao.flowEdges(flowId))
+        }
+        return createMermaid(flow.folderId, "Diagrama · ${flow.title}".take(200), code)
     }
     /**
      * Copia (no enlaza) un flowchart en un Flow: uno nuevo en `parent` si `target` es null, o al lado derecho del

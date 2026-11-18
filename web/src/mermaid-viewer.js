@@ -1,32 +1,16 @@
 // Visor local de diagramas Mermaid de Hyper-Marker. Sin red: Mermaid y la fuente viajan en el APK.
 // Android llama a funciones acotadas; las respuestas salen por MermaidBridge (origen exacto, ver MermaidScreen.kt).
-import latin from '@fontsource/recursive/files/recursive-latin-400-normal.woff2';
-import latinExt from '@fontsource/recursive/files/recursive-latin-ext-400-normal.woff2';
+import { CONFIG, FAMILY, FONT_CSS, MAX_SOURCE, installFont, polish } from './mermaid-config.js';
 
-const FAMILY = 'Recursive Variable';
-const FONT_CSS =
-  `@font-face{font-family:"${FAMILY}";font-style:normal;font-weight:400;font-display:block;src:url(${latin}) format("woff2");` +
-  'unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}' +
-  `@font-face{font-family:"${FAMILY}";font-style:normal;font-weight:400;font-display:block;src:url(${latinExt}) format("woff2");` +
-  'unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}';
-export const MAX_SOURCE = 300_000;
+export { MAX_SOURCE };
 const MAX_SIDE = 8192;
 const MAX_PIXELS = 40_000_000;
 const CHUNK = 400_000;
 const DIAGRAM_ID = 'hm-diagram';
 
-const style = document.createElement('style');
-style.textContent = FONT_CSS;
-document.head.appendChild(style);
-
+installFont();
 const mermaid = window.mermaid;
-mermaid.initialize({
-  startOnLoad: false, securityLevel: 'strict', theme: 'redux-color', look: 'neo',
-  fontFamily: `"${FAMILY}",arial,sans-serif`, maxTextSize: MAX_SOURCE, maxEdges: 4000,
-  suppressErrorRendering: true, deterministicIds: true,
-  // Etiquetas SVG (sin foreignObject): el PNG puede rasterizarse sin contaminar el canvas y el SVG se abre en más editores.
-  htmlLabels: false, flowchart: { htmlLabels: false, wrappingWidth: 180 },
-});
+mermaid.initialize(CONFIG);
 
 let session = null;
 let rendered = null; // {source, svg, type, width, height}
@@ -58,6 +42,7 @@ async function renderNow(source) {
   const host = document.getElementById('diagram');
   host.innerHTML = svg;
   const element = host.querySelector('svg');
+  polish(element);
   const box = element.viewBox.baseVal;
   const width = box && box.width ? box.width : element.getBBox().width;
   const height = box && box.height ? box.height : element.getBBox().height;
@@ -165,7 +150,9 @@ window.exportDiagram = (source, requestId, kind, scale) => serial(async () => {
 });
 
 const LABEL_LIMIT = 4000;
-const clip = (value) => String(value ?? '').slice(0, LABEL_LIMIT);
+// El parser guarda `#quot;`/`#35;` con marcadores internos (ﬂ°…¶ß); se devuelven como entidades HTML, que el host decodifica.
+const decode = (value) => String(value ?? '').replace(/ﬂ°°/g, '&#').replace(/ﬂ°/g, '&').replace(/¶ß/g, ';');
+const clip = (value) => decode(value).slice(0, LABEL_LIMIT);
 
 function centers(prefix, selector) {
   const element = svgElement();

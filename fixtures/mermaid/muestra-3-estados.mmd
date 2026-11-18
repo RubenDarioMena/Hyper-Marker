@@ -1,0 +1,6 @@
+stateDiagram-v2
+    [*] --> Inactivo
+    Inactivo --> Cargando: energía
+    Cargando --> Activo
+    Activo --> Inactivo: apagar
+    Activo --> [*]

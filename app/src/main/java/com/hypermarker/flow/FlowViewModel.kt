@@ -83,6 +83,8 @@ class FlowViewModel(val documentId: String, val repository: LibraryRepository, v
             else repository.updateFlowNode(documentId, value.node, title, body)
         }
     }
+    /** Crea un diagrama Mermaid copiado de este Flow y lo entrega para abrirlo. */
+    fun toDiagram(onCreated: (String) -> Unit) = run { onCreated(repository.createMermaidFromFlow(documentId).id) }
     fun toggleCollapsed(id: String) { val node = node(id) ?: return; run { repository.setFlowCollapsed(documentId, id, !node.collapsed) } }
     fun delete(id: String) { if (selected == id) select(null); run { repository.deleteFlowNode(documentId, id) } }
     fun disconnect(edge: FlowEdge) = run { repository.deleteFlowEdge(documentId, edge.id) }

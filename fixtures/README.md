@@ -8,6 +8,7 @@ Todos los ejemplos de notas/HTML y generadores de esta carpeta fueron creados pa
 - `dynamic/` y `surface/`: objetivos que desaparecen/cambian y ancla de canvas.
 - `markdown/`: corpus compatible y texto que debe permanecer en Source.
 - `react-src/`: fuente React; `react-built/`: salida Vite de producción con `base: './'`. Sólo la salida compilada se importa en Android.
+- `mermaid/muestra-*.mmd`: los cuatro códigos cuyas capturas entregó el propietario como referencia (`docs/design/mermaid/`). `mermaid/flow-export-sample.mmd`: salida exacta esperada de Flow → Mermaid, compartida por `FlowMermaidTest` y la prueba web.
 - `mermaid/generador-gravitacional.mmd`: diagrama de referencia del propietario para la función Mermaid (flowchart con dos subgrafos, 21 nodos y 25 aristas). Su grafo extraído por el visor está en `app/src/test/resources/mermaid/`; regenerarlo si cambia la versión de Mermaid.
 - `malicious/`: ZIP pequeños que prueban traversal, rutas absolutas, symlinks y colisiones. No abrirlos con extractores generales; se usan contra el importador controlado y en directorios temporales.
 

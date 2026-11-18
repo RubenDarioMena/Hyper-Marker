@@ -135,3 +135,40 @@ test('hostile labels, click directives and init directives cannot run script or 
     assert.deepEqual(remote, []);
   });
 });
+
+test('the Flow → Mermaid export sample renders with its subgraph, labels and the restored dotted cycle', async () => {
+  const code = await readFile(resolve('../fixtures/mermaid/flow-export-sample.mmd'), 'utf8');
+  await open(async (page, {problems}) => {
+    assert.equal(await page.evaluate((c) => renderDiagram(c, 'test'), code), true);
+    await page.evaluate((c) => requestGraph(c, 'f1'), code);
+    const graph = JSON.parse((await collect(page, 'f1')).data);
+    assert.equal(graph.nodes.length, 4); assert.equal(graph.edges.length, 3); assert.equal(graph.groups.length, 1);
+    assert.deepEqual(graph.edges.map((e) => e.from + '>' + e.to + ':' + e.label + ':' + e.stroke), ['n1>n2:sí:normal', 'n2>n3::normal', 'n3>n1:reintentar:dotted']);
+    assert.equal(graph.nodes.find((n) => n.id === 'n2').label, 'Medio &quot;quoted&quot; &lt;x&gt;<br>Detalle 1<br>Detalle 2');
+    assert.equal(graph.groups[0].title, 'Fase &#35; 2');
+    assert.deepEqual(problems, []);
+  });
+});
+
+test('the owner reference samples render with their look: shapes, nested subgraphs, centred state labels, grey edge labels, mindmap', async () => {
+  const names = ['muestra-1-flowchart-formas', 'muestra-2-subgrafos-anidados', 'muestra-3-estados', 'muestra-4-mapa-mental'];
+  const types = ['flowchart-v2', 'flowchart-v2', 'stateDiagram', 'mindmap'];
+  await open(async (page, {remote, problems}) => {
+    for (const [i, name] of names.entries()) {
+      const code = await readFile(resolve(`../fixtures/mermaid/${name}.mmd`), 'utf8');
+      assert.equal(await page.evaluate((c) => renderDiagram(c, 'test'), code), true, name);
+      assert.equal(await page.evaluate(() => events.filter((e) => e.type === 'rendered').at(-1).payload.diagramType), types[i]);
+      if (i === 1) assert.equal(await page.locator('#diagram g.cluster').count(), 3);
+      if (i === 2) {
+        const offsets = await page.evaluate(() => [...document.querySelectorAll('#diagram g.node.statediagram-state')].map((node) => {
+          const shape = node.querySelector(':scope > rect, :scope > path').getBoundingClientRect(), text = node.querySelector(':scope > g.label text').getBoundingClientRect();
+          return Math.abs((shape.left + shape.width / 2) - (text.left + text.width / 2));
+        }));
+        assert.ok(offsets.length === 3 && offsets.every((d) => d < 1.5), 'etiquetas de estado centradas: ' + offsets);
+        assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#diagram g.edgeLabel rect.background')).fill), 'rgb(204, 204, 204)');
+      }
+      if (i === 3) assert.equal(await page.locator('#diagram g.mindmap-node, #diagram g.node').count() >= 7, true);
+    }
+    assert.deepEqual(remote, []); assert.deepEqual(problems, []);
+  });
+});

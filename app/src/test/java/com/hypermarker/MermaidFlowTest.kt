@@ -66,6 +66,9 @@ class MermaidFlowTest {
         assertEquals(listOf("negrita y código"), MermaidFlow.lines("`**negrita** y código`"))
         assertEquals(listOf("sin etiquetas"), MermaidFlow.lines("<b>sin</b> <img src=x onerror=alert(1)>etiquetas"))
         assertEquals(listOf("#"), MermaidFlow.lines("#35;"))
+        // Así llegan desde el visor (entidades HTML tras decodificar los marcadores internos de Mermaid).
+        assertEquals(listOf("Medio \"quoted\" <x>", "Detalle"), MermaidFlow.lines("Medio &quot;quoted&quot; &lt;x&gt;<br>Detalle"))
+        assertEquals(listOf("Fase # 2"), MermaidFlow.lines("Fase &#35; 2"))
     }
 
     @Test fun cyclesAreNeverCreatedButAreWrittenDownInTheSourcePoint() {
