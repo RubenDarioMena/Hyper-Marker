@@ -6,7 +6,8 @@ import com.hypermarker.storage.FlowNode
 /**
  * Flow → código Mermaid (copia, para compartir o imprimir como SVG/PNG). Mermaid recalcula la disposición.
  *
- * Deshace las anotaciones que deja `MermaidFlow.plan`, para que ida y vuelta no pierdan estructura:
+ * El texto de cada conexión va en la flecha (`-->|texto|`) y las conexiones de retorno salen punteadas (`-.->`).
+ * También deshace las anotaciones que dejaban las copias anteriores a Room v5, para no perder su estructura:
  * «Grupo: X» → subgrafo; «← Padre: texto» → etiqueta de la flecha; «→ Destino (conexión omitida…)» → flecha
  * punteada (Mermaid sí admite ciclos); «↻ Se conecta consigo mismo» → autoconexión.
  */
@@ -75,7 +76,10 @@ object FlowMermaid {
                 append("    end\n")
             }
             if (known.isNotEmpty() || extra.isNotEmpty()) append('\n')
-            known.forEach { edge -> append("    ${ids[edge.fromId]} -->").append(label(labels[edge.fromId to edge.toId])).append(" ${ids[edge.toId]}\n") }
+            known.forEach { edge ->
+                append("    ${ids[edge.fromId]} ").append(if (edge.loop) "-.->" else "-->")
+                    .append(label(edge.label ?: labels[edge.fromId to edge.toId])).append(" ${ids[edge.toId]}\n")
+            }
             extra.forEach { append("    ").append(it).append('\n') }
             val colored = ordered.filter { it.ringColor != null && it.id !in grouped }
             if (colored.isNotEmpty()) append('\n')

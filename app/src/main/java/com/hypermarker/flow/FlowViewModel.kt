@@ -88,7 +88,14 @@ class FlowViewModel(val documentId: String, val repository: LibraryRepository, v
     fun toggleCollapsed(id: String) { val node = node(id) ?: return; run { repository.setFlowCollapsed(documentId, id, !node.collapsed) } }
     fun delete(id: String) { if (selected == id) select(null); run { repository.deleteFlowNode(documentId, id) } }
     fun disconnect(edge: FlowEdge) = run { repository.deleteFlowEdge(documentId, edge.id) }
-    fun connect(from: String, to: String) { connecting = null; run { repository.connectFlowNodes(documentId, from, to) } }
+    fun connect(from: String, to: String) {
+        connecting = null
+        run { if (repository.connectFlowNodes(documentId, from, to).loop) message = "Conexión de retorno: se dibuja punteada y no cambia el plegado" }
+    }
+    /** Conexión cuyo texto se está editando. */
+    var editingEdge by mutableStateOf<String?>(null)
+    fun edge(id: String?) = edges.value.firstOrNull { it.id == id }
+    fun setEdgeLabel(id: String, label: String) { editingEdge = null; run { repository.labelFlowEdge(documentId, id, label) } }
     fun drag(id: String, x: Float, y: Float) { moving[id] = x to y }
     fun drop(id: String) {
         val (x, y) = moving[id] ?: return
@@ -127,15 +134,16 @@ class FlowViewModel(val documentId: String, val repository: LibraryRepository, v
     }
     private val loading = mutableSetOf<String>()
 
-    /** Destinos válidos para conectar desde `from`: excluye conexiones existentes y las que crearían un ciclo. */
+    /** Destinos válidos para conectar desde `from`: todos salvo él mismo y los ya conectados en ese sentido. */
     fun targets(from: String): List<FlowNode> {
-        val pairs = edges.value.map { it.fromId to it.toId }
-        return nodes.value.orEmpty().filter { it.id != from && (from to it.id) !in pairs && !FlowGraph.wouldCreateCycle(pairs, from, it.id) }
+        val pairs = edges.value.map { it.fromId to it.toId }.toSet()
+        return nodes.value.orEmpty().filter { it.id != from && (from to it.id) !in pairs }
     }
-    fun canConnect(from: String, to: String) = targets(from).any { it.id == to }
+    fun canConnect(from: String, to: String) = from != to && edges.value.none { it.fromId == from && it.toId == to } && node(to) != null
+    /** `true` si `from → to` sería un retorno: cerraría un ciclo en el árbol, así que sólo se dibuja. */
+    fun isLoop(from: String, to: String) = FlowGraph.wouldCreateCycle(edges.value.filter { !it.loop }.map { it.fromId to it.toId }, from, to)
     fun reasonNotConnectable(from: String, to: String) = when {
         from == to -> null
-        edges.value.any { it.fromId == from && it.toId == to } -> "Esos puntos ya están conectados"
-        else -> "La conexión crearía un ciclo"
+        else -> "Esos puntos ya están conectados"
     }
 }

@@ -50,14 +50,19 @@ data class FlowNodeLink(@PrimaryKey val id: String, val documentId: String, val 
     val targetDocumentId: String? = null, val targetFolderId: String? = null, val imagePath: String? = null, val imageTitle: String? = null,
     val position: Int = 0, val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null)
 
-/** Conexión dirigida: `fromId` es el padre. */
+/**
+ * Conexión dirigida: `fromId` es el padre. `loop` marca una conexión de retorno (por ejemplo de un hijo a un
+ * antepasado): sólo se dibuja; no cuenta para ciclos, plegado ni raíces, así el árbol padre → hijo no cambia.
+ * `label` es el texto que se muestra en medio de la flecha.
+ */
 @Entity(tableName = "flow_edges", foreignKeys = [
     ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE),
     ForeignKey(entity = FlowNode::class, parentColumns = ["id"], childColumns = ["fromId"], onDelete = ForeignKey.CASCADE),
     ForeignKey(entity = FlowNode::class, parentColumns = ["id"], childColumns = ["toId"], onDelete = ForeignKey.CASCADE)],
     indices = [Index("documentId"), Index("fromId"), Index("toId")])
 data class FlowEdge(@PrimaryKey val id: String, val documentId: String, val fromId: String, val toId: String,
-    val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null)
+    val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = System.currentTimeMillis(), val deletedAt: Long? = null,
+    val label: String? = null, @ColumnInfo(defaultValue = "0") val loop: Boolean = false)
 
 @Entity(tableName = "remote_folders", foreignKeys = [ForeignKey(entity = Folder::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["folderId"], unique = true), Index(value = ["repositoryId", "branch", "repoPath"])])
 data class RemoteFolder(@PrimaryKey val id: String, val folderId: String, val repositoryId: Long,
@@ -118,7 +123,7 @@ interface LibraryDao {
     @Query("DELETE FROM documents WHERE id=:id") suspend fun deleteDocument(id: String)
 }
 
-@Database(entities = [Folder::class, Document::class, Annotation::class, ViewerPreference::class, FlowNode::class, FlowEdge::class, RemoteFolder::class, RemoteEntry::class, FlowNodeLink::class], version = 4, exportSchema = true)
+@Database(entities = [Folder::class, Document::class, Annotation::class, ViewerPreference::class, FlowNode::class, FlowEdge::class, RemoteFolder::class, RemoteEntry::class, FlowNodeLink::class], version = 5, exportSchema = true)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
     companion object {
@@ -141,6 +146,13 @@ abstract class LibraryDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `remote_entries` (`id` TEXT NOT NULL, `remoteFolderId` TEXT NOT NULL, `path` TEXT NOT NULL, `sha` TEXT NOT NULL, `size` INTEGER NOT NULL, `documentId` TEXT, `state` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`remoteFolderId`) REFERENCES `remote_folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_remote_entries_remoteFolderId` ON `remote_entries` (`remoteFolderId`)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_remote_entries_remoteFolderId_path` ON `remote_entries` (`remoteFolderId`, `path`)")
+            }
+        }
+        /** v4 → v5: texto en las flechas y conexiones de retorno. Sólo añade columnas; las conexiones existentes quedan como árbol. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `flow_edges` ADD COLUMN `label` TEXT")
+                db.execSQL("ALTER TABLE `flow_edges` ADD COLUMN `loop` INTEGER NOT NULL DEFAULT 0")
             }
         }
         /** v3 → v4: fotos de puntos, relaciones de puntos y última apertura. Sólo añade; no reescribe filas. SQL del esquema 4.json. */

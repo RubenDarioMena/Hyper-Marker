@@ -13,6 +13,8 @@ Nuevo tipo de documento con un canvas infinito. Cada punto es una nota con su t�
 | Plataforma | Compose nativo dentro de Hyper-Marker | Compose cubre canvas, gestos, transiciones y selector de fotos; Flutter add-to-app duplicaría motor, diseño y toolchain; un canvas web contradice la regla nativa del proyecto. |
 | Estructura | Grafo dirigido **sin ciclos**; un punto puede tener varios padres | Permite relaciones reales sin perder la noción de padre. Los ciclos se rechazan al conectar. |
 | Plegado | Un punto plegado oculta los nodos alcanzables sólo a través de él | Un hijo con otro padre visible sigue visible; nunca desaparece un nodo por una ruta alternativa. |
+| Retornos (2026-11-18) | Una conexión que cerraría un ciclo se guarda como **retorno** visual (`loop`), punteada; el árbol sigue sin ciclos y el plegado no la usa | Pedido del propietario: «llamar a dots padres desde los hijos; así funcionan las ideas», sin romper el sistema actual. Detalle en [mermaid.md](mermaid.md#retornos-en-flow-bucles-visuales-implementado-2026-11-18). |
+| Texto en flechas (2026-11-18) | `flow_edges.label`, editable tocando el centro de la flecha o desde «Conexiones» | Herramienta explicativa pedida por el propietario; Room v5. |
 | Soltar conexión en vacío | Se cancela | Evita crear nodos accidentales. |
 | Persistencia | Tablas Room por entidad (`flow_nodes`, `flow_edges`) con `updatedAt` y tombstone `deletedAt` | Preparadas para sincronización incremental futura; evita reescribir el grafo entero como un blob. |
 | Coordenadas | Unidades de mundo en dp; la cámara (desplazamiento, escala) es estado de sesión | La posición del punto es dato del documento; la vista no se sincroniza. |

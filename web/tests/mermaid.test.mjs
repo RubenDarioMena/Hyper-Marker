@@ -172,3 +172,24 @@ test('the owner reference samples render with their look: shapes, nested subgrap
     assert.deepEqual(remote, []); assert.deepEqual(problems, []);
   });
 });
+
+test('state diagrams and mind maps expose their structure for the Flow conversion', async () => {
+  const state = 'stateDiagram-v2\n  [*] --> Inactivo\n  Inactivo --> Cargando: energía\n  Cargando --> Activo\n  Activo --> Inactivo: apagar\n  state Activo {\n    [*] --> Disparando\n    Disparando --> Enfriando\n  }\n  Activo --> [*]';
+  const mind = await readFile(resolve('../fixtures/mermaid/muestra-4-mapa-mental.mmd'), 'utf8');
+  await open(async (page) => {
+    await page.evaluate((c) => { renderDiagram(c, 'test'); return requestGraph(c, 's1'); }, state);
+    const r1 = await collect(page, 's1'); assert.equal(r1.failed, undefined, JSON.stringify(r1.failed));
+    const s = JSON.parse(r1.data);
+    assert.equal(s.supported, true);
+    assert.deepEqual(s.nodes.map((n) => n.label).sort(), ['Cargando', 'Disparando', 'Enfriando', 'Inactivo', '● Inicio', '● Inicio', '◉ Fin'].sort());
+    assert.ok(s.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y)), 'todos los estados tienen posición');
+    assert.equal(s.groups.length, 1); assert.equal(s.groups[0].title, 'Activo'); assert.equal(s.groups[0].nodes.length, 3);
+    assert.ok(s.edges.some((e) => e.from === 'Activo' && e.to === 'Inactivo' && e.label === 'apagar'));
+    await page.evaluate((c) => requestGraph(c, 'm1'), mind);
+    const m = JSON.parse((await collect(page, 'm1')).data);
+    assert.equal(m.supported, true); assert.equal(m.nodes.length, 7); assert.equal(m.edges.length, 6);
+    const colors = new Set(m.nodes.filter((n) => n.label !== 'Superarma').map((n) => n.color));
+    assert.equal(colors.size, 2, 'una color por rama: ' + [...colors]);
+    assert.ok(m.nodes.every((n) => /^#[0-9a-f]{6}$/.test(n.color)));
+  });
+});

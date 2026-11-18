@@ -91,7 +91,7 @@ class MermaidViewModel(val id: String, val repository: LibraryRepository) : View
             busy = "Copiando al Flow…"
             try {
                 val graph = withContext(Dispatchers.Default) { MermaidFlow.parse(graphJson) }
-                if (!graph.supported) { notice = "Por ahora sólo los diagramas flowchart (o graph) se convierten en Flow. Este es «${graph.type}»."; return@launch }
+                if (!graph.supported) { notice = "Sólo los flowcharts, diagramas de estados y mapas mentales se convierten en Flow. Este es «${diagramName(graph.type)}»."; return@launch }
                 val date = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date())
                 val (flow, plan) = repository.copyMermaidToFlow(graph, target, folder, title, title to "Copia del diagrama Mermaid «$title» · $date")
                 copied = CopyResult(flow.id, flow.title, target == null, plan.summary())

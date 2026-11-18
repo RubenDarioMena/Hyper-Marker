@@ -55,6 +55,8 @@ object FlowInk {
     val soft = Color(0xFFD6DDD9)
     val pin = Color(0xFFE5B62F)
     val danger = Color(0xFFFF8A80)
+    /** Conexiones de retorno (bucles visuales). */
+    val loop = Color(0xFFB9A7FF)
     /** Colores de anillo elegibles para un punto con foto (pantalla 12). */
     val rings = listOf(0xFF89D5BC, 0xFFE5B62F, 0xFFE9826E, 0xFF5E86D8, 0xFFFFFDF7)
 }

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset as IOff
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.hypermarker.storage.FlowEdge
 import com.hypermarker.storage.FlowNode
 import com.hypermarker.ui.theme.FlowInk
 import com.hypermarker.ui.theme.Inter
@@ -78,7 +79,8 @@ internal fun FlowCanvas(model: FlowViewModel, nodes: List<FlowNode>, size: IntSi
     val density = LocalDensity.current.density
     val haptics = LocalHapticFeedback.current
     val measurer = rememberTextMeasurer(cacheSize = 256)
-    val pairs = remember(edges) { edges.map { it.fromId to it.toId } }
+    // Las conexiones de retorno sólo se dibujan: plegado, raíces y padres usan el árbol.
+    val pairs = remember(edges) { edges.filter { !it.loop }.map { it.fromId to it.toId } }
     val collapsed = remember(nodes) { nodes.filter { it.collapsed }.map { it.id }.toSet() }
     val hidden = remember(nodes, pairs) { FlowGraph.hidden(nodes.map { it.id }, pairs, collapsed) }
     val counts = remember(pairs, collapsed, hidden) { FlowGraph.hiddenCounts(pairs, collapsed, hidden) }
@@ -89,6 +91,8 @@ internal fun FlowCanvas(model: FlowViewModel, nodes: List<FlowNode>, size: IntSi
     val currentParents by rememberUpdatedState(parents)
     val currentRoots by rememberUpdatedState(roots)
     val currentTap by rememberUpdatedState(onTap)
+    val currentEdges by rememberUpdatedState(edges)
+    val currentHidden by rememberUpdatedState(hidden)
     var link by remember { mutableStateOf<Pair<String, Offset>?>(null) }
     var linkTarget by remember { mutableStateOf<String?>(null) }
 
@@ -106,6 +110,23 @@ internal fun FlowCanvas(model: FlowViewModel, nodes: List<FlowNode>, size: IntSi
         return FlowGraph.nearestWithin(currentVisible.filter { it.id != except }, x, y, { model.position(it) }) {
             max(HIT_DP * density, look.radius(it) + 8 * density) / unit
         }
+    }
+
+    /** Conexión cuyo punto medio (donde va su texto) está bajo el dedo. */
+    fun edgeAt(screen: Offset): FlowEdge? {
+        val camera = model.camera ?: return null
+        val look = FlowLook(camera.scale, density, currentRoots)
+        val byId = currentVisible.associateBy { it.id }
+        fun at(node: FlowNode) = model.position(node).let { (x, y) -> Offset(camera.toScreenX(x, density), camera.toScreenY(y, density)) }
+        val obstacles = currentVisible.map(::at).toMutableList()
+        return currentEdges.asSequence().filter { it.fromId !in currentHidden && it.toId !in currentHidden }.toList().mapNotNull { edge ->
+            val from = byId[edge.fromId] ?: return@mapNotNull null; val to = byId[edge.toId] ?: return@mapNotNull null
+            val shape = edgeShape(at(from), at(to), look.radius(from), look.radius(to), 6 * density, if (edge.loop) LOOP_BEND * density else 0f)
+            val text = edge.label
+            val mid = if (text.isNullOrBlank() || !look.detail) shape.mid
+                else shape.labelPoint(obstacles, LABEL_CLEARANCE_DP * density).also { obstacles += labelFootprint(it, text, density) }
+            (edge to (mid - screen).getDistance()).takeIf { it.second <= EDGE_HIT_DP * density }
+        }.minByOrNull { it.second }?.first
     }
 
     Canvas(Modifier.fillMaxSize()
@@ -160,7 +181,9 @@ internal fun FlowCanvas(model: FlowViewModel, nodes: List<FlowNode>, size: IntSi
                 when (press) {
                     Press.TAP -> if (!model.rearrange) {
                         val camera = model.camera
+                        val edge = if (node == null) edgeAt(start) else null
                         if (node != null) currentTap(node)
+                        else if (edge != null) model.editingEdge = edge.id
                         else if (model.selected != null) model.select(null)
                         else if (camera != null) model.startCreate(camera.toWorldX(start.x, density), camera.toWorldY(start.y, density))
                     }
@@ -213,21 +236,42 @@ internal fun FlowCanvas(model: FlowViewModel, nodes: List<FlowNode>, size: IntSi
         fun inside(p: Offset) = p.x > -margin && p.y > -margin && p.x < this.size.width + margin && p.y < this.size.height + margin
         val selected = model.selected
         val byId = visible.associateBy { it.id }
+        val edgeText = TextStyle(color = FlowInk.soft, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = Inter)
+        val labels = mutableListOf<Pair<Offset, String>>()
+        val obstacles = visible.mapNotNull { node -> screen(node.id)?.takeIf(::inside) }.toMutableList()
         for (edge in edges) {
             if (edge.fromId in hidden || edge.toId in hidden) continue
             val from = byId[edge.fromId] ?: continue; val to = byId[edge.toId] ?: continue
             val a = screen(edge.fromId) ?: continue; val b = screen(edge.toId) ?: continue
             if (!inside(a) && !inside(b) && !crosses(a, b, this.size.width, this.size.height)) continue
             val hot = selected != null && (edge.fromId == selected || edge.toId == selected)
-            drawEdge(a, b, look.radius(from), look.radius(to), if (hot) FlowInk.pin else FlowInk.mint.copy(alpha = .85f),
-                max(1.5f, 2.5.dp.toPx() * sqrt(camera.scale).coerceAtMost(1.2f)), dashed = to.collapsed)
+            val shape = edgeShape(a, b, look.radius(from), look.radius(to), 6.dp.toPx(), if (edge.loop) LOOP_BEND.dp.toPx() else 0f)
+            val color = when { hot -> FlowInk.pin; edge.loop -> FlowInk.loop; else -> FlowInk.mint.copy(alpha = .85f) }
+            drawEdge(shape, color, max(1.5f, 2.5.dp.toPx() * sqrt(camera.scale).coerceAtMost(1.2f)),
+                dash = when { edge.loop -> floatArrayOf(9.dp.toPx(), 6.dp.toPx()); to.collapsed -> floatArrayOf(2.dp.toPx(), 7.dp.toPx()); else -> null })
+            val text = edge.label
+            if (look.detail && !text.isNullOrBlank()) {
+                val point = shape.labelPoint(obstacles, LABEL_CLEARANCE_DP.dp.toPx())
+                labels += point to text; obstacles += labelFootprint(point, text, density)
+            }
+        }
+        // Textos de las flechas encima de todas las líneas, en una píldora legible.
+        for ((mid, text) in labels) {
+            val measured = measurer.measure(text, edgeText, overflow = TextOverflow.Ellipsis, softWrap = false, maxLines = 1,
+                constraints = Constraints(maxWidth = (160.dp.toPx() * camera.scale.coerceIn(.7f, 1.3f)).toInt().coerceAtLeast(1)))
+            val w = measured.size.width + 14.dp.toPx(); val h = measured.size.height + 6.dp.toPx()
+            val topLeft = Offset(mid.x - w / 2, mid.y - h / 2)
+            drawRoundRect(FlowInk.raised, topLeft, Size(w, h), androidx.compose.ui.geometry.CornerRadius(h / 2))
+            drawRoundRect(FlowInk.outline, topLeft, Size(w, h), androidx.compose.ui.geometry.CornerRadius(h / 2), style = Stroke(1.dp.toPx()))
+            drawText(measured, topLeft = topLeft + Offset(7.dp.toPx(), 3.dp.toPx()))
         }
         link?.let { (from, point) ->
             screen(from)?.let { drawLine(FlowInk.pin, it, point, 2.5.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))) }
             linkTarget?.let { target ->
                 val ok = model.canConnect(from, target)
+                val color = when { !ok -> FlowInk.danger; model.isLoop(from, target) -> FlowInk.loop; else -> FlowInk.pin }
                 val node = byId[target]
-                if (node != null) screen(target)?.let { drawCircle(if (ok) FlowInk.pin else FlowInk.danger, look.radius(node) + 10.dp.toPx(), it, style = Stroke(3.dp.toPx())) }
+                if (node != null) screen(target)?.let { drawCircle(color, look.radius(node) + 10.dp.toPx(), it, style = Stroke(3.dp.toPx())) }
             }
         }
         val pill = TextStyle(color = FlowInk.canvas, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = Inter)
@@ -342,19 +386,66 @@ private fun DrawScope.drawGrid(camera: FlowCamera, density: Float) {
     if (points.size <= 8000) drawPoints(points, PointMode.Points, FlowInk.grid, strokeWidth = 2.4.dp.toPx() * camera.scale.coerceIn(.6f, 1.2f), cap = StrokeCap.Round)
 }
 
-/** Curva padre → hijo que sale del borde del padre y termina, con una flecha discreta, en el borde del hijo. */
-private fun DrawScope.drawEdge(a: Offset, b: Offset, ra: Float, rb: Float, color: Color, width: Float, dashed: Boolean) {
+/** Separación lateral (dp) de una conexión de retorno, para no taparse con la conexión de ida entre los mismos puntos. */
+internal const val LOOP_BEND = 34f
+private const val EDGE_HIT_DP = 22f
+private const val LABEL_CLEARANCE_DP = 46f
+
+/** Centro y extremos aproximados de una píldora de texto, para que los textos siguientes no la tapen. */
+private fun labelFootprint(center: Offset, text: String, density: Float): List<Offset> {
+    val half = (minOf(160f, text.length * 6.5f + 14f) / 2 - 10f).coerceAtLeast(0f) * density
+    return listOf(center, center + Offset(half, 0f), center - Offset(half, 0f))
+}
+
+/** Geometría de una flecha en pantalla: curva cúbica del borde del padre al borde del hijo. */
+internal class EdgeShape(val start: Offset, val c1: Offset, val c2: Offset, val end: Offset, val dir: Offset) {
+    /** Punto medio de la curva (t = 0,5). */
+    val mid get() = at(.5f)
+    fun at(t: Float): Offset {
+        val u = 1 - t
+        return start * (u * u * u) + c1 * (3 * u * u * t) + c2 * (3 * u * t * t) + end * (t * t * t)
+    }
+    /**
+     * Dónde va el texto de la flecha (y su toque): el punto de la curva entre el 28 % y el 72 % más alejado de los
+     * puntos dibujados, para no tapar títulos; en igualdad, el más cercano al centro.
+     */
+    fun labelPoint(obstacles: List<Offset>, clearance: Float): Offset {
+        var best = mid; var bestDistance = -1f
+        for (t in floatArrayOf(.5f, .4f, .6f, .32f, .68f, .28f, .72f)) {
+            val point = at(t)
+            val distance = obstacles.minOfOrNull { (it - point).getDistance() } ?: Float.MAX_VALUE
+            if (distance >= clearance) return point
+            if (distance > bestDistance) { best = point; bestDistance = distance }
+        }
+        return best
+    }
+}
+
+/** `bend` desplaza la curva a un lado (en px); las de retorno se arquean para distinguirse. */
+internal fun edgeShape(a: Offset, b: Offset, ra: Float, rb: Float, gap: Float, bend: Float): EdgeShape {
     val d = b - a
     val horizontal = abs(d.x) > abs(d.y) * 1.6f
-    val c1 = if (horizontal) Offset(a.x + d.x / 2, a.y) else Offset(a.x, a.y + d.y / 2)
-    val c2 = if (horizontal) Offset(b.x - d.x / 2, b.y) else Offset(b.x, b.y - d.y / 2)
+    var c1 = if (horizontal) Offset(a.x + d.x / 2, a.y) else Offset(a.x, a.y + d.y / 2)
+    var c2 = if (horizontal) Offset(b.x - d.x / 2, b.y) else Offset(b.x, b.y - d.y / 2)
+    if (bend != 0f) {
+        // El arco crece con la distancia: un retorno largo no pasa por encima de los puntos intermedios de la cadena.
+        val length = max(d.getDistance(), 1f)
+        val amount = max(abs(bend), length * .3f) * kotlin.math.sign(bend)
+        val normal = Offset(-d.y, d.x) / length * amount
+        c1 += normal * 1.33f; c2 += normal * 1.33f
+    }
     val toward = (b - c2).let { if (it.getDistance() < 1f) d else it }
     val dir = toward / max(toward.getDistance(), 1f)
-    val gap = 6.dp.toPx()
     val end = b - dir * (rb + gap)
     val start = a + ((c1 - a).let { if (it.getDistance() < 1f) d else it }.let { it / max(it.getDistance(), 1f) }) * (ra + gap)
+    return EdgeShape(start, c1, c2, end, dir)
+}
+
+/** Curva padre → hijo que sale del borde del padre y termina, con una flecha discreta, en el borde del hijo. */
+private fun DrawScope.drawEdge(shape: EdgeShape, color: Color, width: Float, dash: FloatArray?) {
+    val start = shape.start; val c1 = shape.c1; val c2 = shape.c2; val end = shape.end; val dir = shape.dir
     drawPath(Path().apply { moveTo(start.x, start.y); cubicTo(c1.x, c1.y, c2.x, c2.y, end.x, end.y) }, color,
-        style = Stroke(width, cap = StrokeCap.Round, pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 7.dp.toPx())) else null))
+        style = Stroke(width, cap = StrokeCap.Round, pathEffect = dash?.let { PathEffect.dashPathEffect(it) }))
     val head = 7.dp.toPx(); val normal = Offset(-dir.y, dir.x)
     val base = end - dir * head
     drawPath(Path().apply {

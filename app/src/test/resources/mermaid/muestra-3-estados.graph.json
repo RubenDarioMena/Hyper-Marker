@@ -1,0 +1,90 @@
+{
+ "type": "stateDiagram",
+ "supported": true,
+ "direction": "TB",
+ "nodes": [
+  {
+   "id": "root_start",
+   "label": "● Inicio",
+   "shape": "stateStart",
+   "x": 124,
+   "y": 19,
+   "width": 14,
+   "height": 14,
+   "color": null
+  },
+  {
+   "id": "Inactivo",
+   "label": "Inactivo",
+   "shape": "rect",
+   "x": 124,
+   "y": 82.5,
+   "width": 136,
+   "height": 33,
+   "color": null
+  },
+  {
+   "id": "Cargando",
+   "label": "Cargando",
+   "shape": "rect",
+   "x": 80,
+   "y": 216.5,
+   "width": 136,
+   "height": 33,
+   "color": null
+  },
+  {
+   "id": "Activo",
+   "label": "Activo",
+   "shape": "rect",
+   "x": 124,
+   "y": 289.5,
+   "width": 136,
+   "height": 33,
+   "color": null
+  },
+  {
+   "id": "root_end",
+   "label": "◉ Fin",
+   "shape": "stateEnd",
+   "x": 124.00664520263672,
+   "y": 353,
+   "width": 14.013290405273438,
+   "height": 14,
+   "color": null
+  }
+ ],
+ "edges": [
+  {
+   "from": "root_start",
+   "to": "Inactivo",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "Inactivo",
+   "to": "Cargando",
+   "label": "energía",
+   "stroke": "normal"
+  },
+  {
+   "from": "Cargando",
+   "to": "Activo",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "Activo",
+   "to": "Inactivo",
+   "label": "apagar",
+   "stroke": "normal"
+  },
+  {
+   "from": "Activo",
+   "to": "root_end",
+   "label": "",
+   "stroke": "normal"
+  }
+ ],
+ "groups": []
+}

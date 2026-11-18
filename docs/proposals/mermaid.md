@@ -14,23 +14,25 @@ Referencia visual del propietario: su diagrama «Generador gravitacional / Super
 - **Copia, nunca enlace.** El Flow no guarda relación ni referencia al documento Mermaid. Editar o borrar el diagrama no cambia el Flow, y viceversa.
 - **Exportar.** *SVG*: archivo autónomo con tamaño explícito, fondo blanco y la fuente incrustada (se ve igual fuera de la app y se abre en editores sin soporte de `foreignObject`). *PNG*: 2×, 3× o 4× con las dimensiones visibles antes de elegir. Por memoria se limita a 8192 px por lado y 40 MP, reduciendo proporcionalmente. El destino se elige con SAF; no se piden permisos.
 
-## Qué no se copia literalmente (y cómo se avisa)
+## Qué se adapta (y cómo se avisa)
 
-Flow es un grafo dirigido **sin ciclos** y sin etiquetas en las conexiones. La conversión nunca pierde información en silencio:
+Desde Room v5 (2026-11-18) las conexiones de Flow admiten texto y **retornos** (bucles visuales), así que la copia conserva casi todo:
 
 | Mermaid | En el Flow |
 | --- | --- |
-| Arista que cerraría un ciclo | No se crea; el punto de origen anota «→ destino (conexión omitida: crearía un ciclo)». |
-| Etiqueta de arista (`A -- sí --> B`) | Se copia al cuerpo del destino: «← A: sí». |
-| Arista repetida | Una sola conexión; la etiqueta, si la hay, se anota igual. |
-| Autoconexión | Se anota en el punto («↻ Se conecta consigo mismo»). |
+| Etiqueta de flecha (`A -- sí --> B`, `A -->|sí| B`, `X --> Y: texto`) | Texto en medio de la conexión. |
+| Arista que cerraría un ciclo (p. ej. `Activo --> Inactivo` en una máquina de estados) | Conexión de **retorno**: punteada, en lila, fuera del plegado y de las raíces. |
+| Arista repetida | Una sola conexión; si traían textos distintos se unen con « / ». |
+| Autoconexión | Se anota en el punto («↻ Se conecta consigo mismo»): Flow no dibuja autoconexiones. |
 | Enlace invisible `~~~` | Se ignora: sólo sirve para el layout. |
-| Subgrafo usado como extremo de una flecha | Se crea un punto con el título del subgrafo. |
+| Subgrafo o estado compuesto usado como extremo de una flecha | Punto con el título del grupo. |
+| Pseudoestados `[*]` | Puntos «● Inicio» y «◉ Fin». |
+| Ramas de un mapa mental | Color de la rama en cada punto. |
 | Forma del nodo, estilos `classDef`/`style`, iconos | No se copian; los puntos de Flow no tienen forma. |
 
-Al terminar, un diálogo resume puntos, conexiones y cada categoría anterior, con «Abrir Flow» (Atrás vuelve al diagrama).
+Al terminar, un diálogo resume puntos, conexiones, retornos y adaptaciones, con «Abrir Flow» (Atrás vuelve al diagrama). Las posiciones salen del layout de Mermaid; si el layout es compacto (estados, mapas mentales) se amplía hasta una separación típica de 150 dp entre vecinos (máximo ×4) para que los títulos no se tapen.
 
-**Sólo `flowchart`/`graph` se convierten.** Los demás tipos (secuencia, clases, estados, ER, Gantt, mapa mental…) se dibujan, guardan y exportan, pero «Flow nuevo»/«Añadir a Flow» responden que ese tipo aún no se convierte.
+**Se convierten flowcharts, diagramas de estados y mapas mentales.** Los demás tipos (secuencia, clases, ER, Gantt…) se dibujan, guardan y exportan; la conversión responde que ese tipo no se convierte.
 
 ## Implementación
 
@@ -59,7 +61,7 @@ Al terminar, un diálogo resume puntos, conexiones y cada categoría anterior, c
 ## Decisiones del propietario (2026-11-18)
 
 1. **Bloques ` ```mermaid ` en notas Markdown: sí.** Implementado (ver abajo).
-2. **Estados y mapas mentales → Flow: pendiente, con evaluación.** Se dibujan y exportan desde ya; la conversión queda anotada (evaluación abajo).
+2. **Estados y mapas mentales → Flow:** primero quedó pendiente con evaluación; el mismo día el propietario pidió implementarlo. Implementado.
 3. **Flow → Mermaid: sí**, sobre todo para exportar SVG/PNG, compartir la idea general de un sistema o imprimirlo para anotar. Implementado (ver abajo).
 4. **Referencias:** entregadas en SVG y PNG. Los SVG están en [`docs/design/mermaid/`](../design/mermaid/) y los códigos en `fixtures/mermaid/muestra-*.mmd`.
 
@@ -88,7 +90,7 @@ Las cuatro muestras se dibujan como en las referencias: formas (estadio, rombo, 
 
 Diferencia aceptada: las referencias usan etiquetas HTML y parten «¿Recursos suficientes?» o «Construir módulo» en dos líneas. Aquí, con `wrappingWidth` 180, caben en una. Se mantienen las etiquetas SVG porque el PNG las necesita (las HTML contaminan el canvas) y el SVG exportado se abre en más editores.
 
-## Evaluación: estados y mapas mentales → Flow (pendiente)
+## Estados y mapas mentales → Flow (implementado 2026-11-18)
 
 Comprobado en el parser incluido: ambos tipos exponen `db.getData()` con la misma forma (nodos con `label`, `parentId` e `isGroup`; aristas con `start`, `end` y `label`). La extracción sería genérica y reutilizaría `MermaidFlow.plan`.
 
@@ -97,11 +99,11 @@ Comprobado en el parser incluido: ambos tipos exponen `db.getData()` con la mism
 | Mapa mental | Baja (≈ medio día con pruebas) | **Alta** para planear: lluvia de ideas → puntos de Flow para luego relacionar documentos y fotos. | Es un árbol: encaja sin pérdidas en Flow (sin ciclos). Las posiciones radiales de Mermaid se pueden conservar. |
 | Estados | Baja–media (≈ 1 día) | Media-baja | Las máquinas de estados suelen ser cíclicas (Activo → Inactivo): varias transiciones quedarían como anotaciones. Hay que traducir los pseudoestados inicio/fin y los estados compuestos (grupos). |
 
-Recomendación: cuando se retome, empezar por mapas mentales. Los estados aportan poco mientras Flow no admita ciclos.
+Evaluación previa conservada arriba. Se implementaron ambos con `getData()` y `domId` (posición y color de cada nodo en el SVG). La objeción de los estados desapareció con los retornos de Flow: `Activo → Inactivo` se copia como retorno con su texto «apagar».
 
-## Evaluación: texto en medio de las flechas de Flow (pregunta del 2026-11-18)
+## Texto en medio de las flechas de Flow (implementado 2026-11-18)
 
-Viable y de alcance acotado (≈ 1–1,5 días con pruebas), recomendado:
+Evaluación previa (viable, ≈ 1–1,5 días) aprobada por el propietario. Lo implementado sigue ese plan:
 
 - **Datos:** columna `label` en `flow_edges` (Room v5, migración `ALTER TABLE … ADD COLUMN`, sin reescribir filas). Hay que respaldar el S24/Tab antes de instalar, como en v2–v4.
 - **Dibujo:** el texto en una píldora en el punto medio de la curva (`FlowCanvas` ya calcula la curva y la flecha). Se oculta por debajo del zoom de detalle, igual que los títulos.
@@ -158,3 +160,13 @@ mindmap
       Acelerador
       Microagujeros
 ```
+
+## Retornos en Flow (bucles visuales, implementado 2026-11-18)
+
+Pedido del propietario: «Flow debería poder aceptar los bucles en el sentido de poder llamar a dots padres desde los hijos. Así es como funcionan las ideas. Aun si dicha feature es solo visual para no romper como funciona el sistema actual».
+
+- Conectar un punto con un antepasado (o con cualquier punto que cerraría un ciclo) ya no se rechaza: se crea una **conexión de retorno** (`flow_edges.loop = 1`). Al arrastrar, el destino se resalta en lila antes de soltar; en «Conectar con…» esos destinos dicen «Retorno».
+- Los retornos se dibujan punteados, en lila y arqueados (el arco crece con la distancia, para no cruzar por encima de la cadena). Su texto se coloca en el tramo de la curva más alejado de puntos y otros textos.
+- **No cambian el sistema actual:** el árbol padre → hijo, la regla sin ciclos, el plegado («+N»), las raíces y «Conexiones» de un padre funcionan igual que antes, porque sólo usan las conexiones normales. Un retorno sólo se dibuja si sus dos puntos están visibles.
+- Si deja de haber camino de vuelta (p. ej. se borra un punto intermedio), las conexiones existentes conservan su tipo; una conexión nueva entre esos puntos sería normal.
+- Mermaid ↔ Flow: los ciclos de Mermaid se copian como retornos y Flow → Mermaid los exporta como `-.->`. Las copias anteriores a v5 conservan sus anotaciones «→ … (conexión omitida…)», que Flow → Mermaid sigue entendiendo.

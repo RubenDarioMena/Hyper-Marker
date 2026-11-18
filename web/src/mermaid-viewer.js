@@ -172,11 +172,51 @@ function centers(prefix, selector) {
   return result;
 }
 
+const hex = (value) => {
+  const match = String(value || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  return match ? '#' + match.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, '0')).join('') : null;
+};
 function color(node) {
   const shape = node?.querySelector('rect, path, polygon');
+  return shape ? hex(getComputedStyle(shape).stroke) : null;
+}
+/** Color de relleno de un nodo (ramas de un mapa mental); si es blanco, el del borde. */
+function fill(node) {
+  const shape = node?.querySelector('rect, path, polygon, circle');
   if (!shape) return null;
-  const match = getComputedStyle(shape).stroke.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  return match ? '#' + match.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, '0')).join('') : null;
+  const value = hex(getComputedStyle(shape).fill);
+  return value && value !== '#ffffff' ? value : hex(getComputedStyle(shape).stroke);
+}
+/** Centro y tamaño de un elemento del SVG en unidades del viewBox. */
+function place(element) {
+  if (!element) return null;
+  const svg = svgElement(), box = svg.viewBox.baseVal, frame = svg.getBoundingClientRect(), rect = element.getBoundingClientRect();
+  const unit = box.width / frame.width;
+  return { x: box.x + (rect.left - frame.left + rect.width / 2) * unit, y: box.y + (rect.top - frame.top + rect.height / 2) * unit,
+    width: rect.width * unit, height: rect.height * unit };
+}
+
+/**
+ * Estados y mapas mentales: Mermaid entrega su estructura común con `db.getData()` (nodos con padre/grupo y aristas
+ * con etiqueta). Los pseudoestados de inicio y fin se nombran; los estados compuestos son grupos.
+ */
+function dataGraph(diagram) {
+  const data = diagram.db.getData();
+  const element = (node) => document.getElementById(DIAGRAM_ID + '-' + node.domId);
+  const name = (node) => node.shape === 'stateStart' ? '● Inicio' : node.shape === 'stateEnd' ? '◉ Fin' : (node.label ?? node.id);
+  const mindmap = diagram.type === 'mindmap';
+  const nodes = data.nodes.filter((node) => !node.isGroup).map((node) => {
+    const at = place(element(node));
+    return { id: clip(node.id), label: clip(name(node)), shape: node.shape || 'rect', x: at?.x ?? null, y: at?.y ?? null,
+      width: at?.width ?? null, height: at?.height ?? null, color: mindmap ? fill(element(node)) : null };
+  });
+  const groups = data.nodes.filter((node) => node.isGroup).map((group) => {
+    const at = place(element(group));
+    return { id: clip(group.id), title: clip(group.label ?? group.id), nodes: data.nodes.filter((node) => node.parentId === group.id).map((node) => clip(node.id)),
+      x: at?.x ?? null, y: at?.y ?? null, width: at?.width ?? null, height: at?.height ?? null, color: null };
+  });
+  const edges = data.edges.map((edge) => ({ from: clip(edge.start), to: clip(edge.end), label: clip(edge.label ?? ''), stroke: 'normal' }));
+  return { type: diagram.type, supported: true, direction: 'TB', nodes, edges, groups };
 }
 
 /**
@@ -186,6 +226,7 @@ function color(node) {
 export async function graph(source) {
   await renderNow(source);
   const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
+  if (diagram.type === 'mindmap' || String(diagram.type).startsWith('stateDiagram')) return dataGraph(diagram);
   if (!String(diagram.type).startsWith('flowchart')) return { type: diagram.type, supported: false };
   const db = diagram.db;
   const vertices = db.getVertices();

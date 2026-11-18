@@ -72,7 +72,7 @@ fun FlowScreen(document: Document, repository: LibraryRepository, previews: Prev
     var managing by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf(true) }
     var diagramming by remember { mutableStateOf(false) }
-    val parents = remember(edges) { edges.map { it.fromId }.toSet() }
+    val parents = remember(edges) { edges.filter { !it.loop }.map { it.fromId }.toSet() }
     val relateImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         val node = model.relating
         if (uri != null && node != null) model.relateImage(node, uri)
@@ -158,7 +158,8 @@ fun FlowScreen(document: Document, repository: LibraryRepository, previews: Prev
     }
 
     model.draft?.let { draft -> NoteEditorSheet(draft, onSave = model::saveDraft, onDismiss = { model.draft = null }) }
-    model.connecting?.let { from -> ConnectSheet(model.targets(from), onPick = { model.connect(from, it.id) }, onDismiss = { model.connecting = null }) }
+    model.connecting?.let { from -> ConnectSheet(model.targets(from), isLoop = { model.isLoop(from, it.id) }, onPick = { model.connect(from, it.id) }, onDismiss = { model.connecting = null }) }
+    model.edge(model.editingEdge)?.let { edge -> EdgeSheet(model, edge) { model.editingEdge = null } }
     managing?.let { id -> ConnectionsSheet(model, id, edges) { managing = null } }
     model.node(model.avatarFor)?.let { node -> FlowAvatarSheet(model, node) { model.avatarFor = null } }
     model.node(model.relating)?.let { node ->

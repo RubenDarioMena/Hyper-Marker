@@ -190,14 +190,16 @@ internal fun NoteEditorSheet(draft: FlowDraft, onSave: (String, String) -> Unit,
 
 /** Lista de puntos con los que se puede conectar. */
 @Composable
-internal fun ConnectSheet(targets: List<FlowNode>, onPick: (FlowNode) -> Unit, onDismiss: () -> Unit) {
+internal fun ConnectSheet(targets: List<FlowNode>, isLoop: (FlowNode) -> Boolean, onPick: (FlowNode) -> Unit, onDismiss: () -> Unit) {
     LightSheetTheme {
         val hm = LocalHm.current
         HmSheet(onDismiss = onDismiss, title = "Conectar con…") {
-            if (targets.isEmpty()) Text("No hay puntos disponibles: ya están conectados o formarían un ciclo.", Modifier.padding(20.dp), color = hm.muted)
+            if (targets.isEmpty()) Text("No hay puntos disponibles: ya están todos conectados desde este punto.", Modifier.padding(20.dp), color = hm.muted)
             else LazyColumn(Modifier.padding(horizontal = 20.dp).heightIn(max = 520.dp)) {
                 items(targets, key = { it.id }) { node ->
-                    HmRow(node.label().ifEmpty { "Punto sin título" }, "Será hijo de este punto", leading = { IconTile(Icons.Outlined.Circle, size = 36.dp) }, onClick = { onPick(node) })
+                    val loop = isLoop(node)
+                    HmRow(node.label().ifEmpty { "Punto sin título" }, if (loop) "Retorno: flecha punteada que no cambia el plegado" else "Será hijo de este punto",
+                        leading = { IconTile(if (loop) Icons.Outlined.Replay else Icons.Outlined.Circle, size = 36.dp) }, onClick = { onPick(node) })
                     HmDivider()
                 }
             }
@@ -217,8 +219,33 @@ internal fun ConnectionsSheet(model: FlowViewModel, id: String, edges: List<Flow
                 items(related, key = { it.id }) { edge ->
                     val child = edge.fromId == id
                     val other = model.node(if (child) edge.toId else edge.fromId)?.label()?.ifEmpty { null } ?: "Punto sin título"
-                    HmRow(other, if (child) "Hijo" else "Padre", trailing = { TextButton(onClick = { model.disconnect(edge) }) { Text("Quitar", color = hm.danger) } })
+                    val kind = when { edge.loop && child -> "Retorno hacia"; edge.loop -> "Retorno desde"; child -> "Hijo"; else -> "Padre" }
+                    HmRow(other, kind + (edge.label?.let { " · «$it»" } ?: ""), onClick = { model.editingEdge = edge.id; onDismiss() },
+                        trailing = { TextButton(onClick = { model.disconnect(edge) }) { Text("Quitar", color = hm.danger) } })
                     HmDivider()
+                }
+            }
+        }
+    }
+}
+
+/** Una conexión: texto en medio de la flecha y quitarla. Se abre tocando el centro de la flecha o desde «Conexiones». */
+@Composable
+internal fun EdgeSheet(model: FlowViewModel, edge: FlowEdge, onDismiss: () -> Unit) {
+    LightSheetTheme {
+        val hm = LocalHm.current
+        var text by remember(edge.id) { mutableStateOf(edge.label.orEmpty()) }
+        val from = model.node(edge.fromId)?.label()?.ifEmpty { null } ?: "Punto sin título"
+        val to = model.node(edge.toId)?.label()?.ifEmpty { null } ?: "Punto sin título"
+        HmSheet(onDismiss = onDismiss, title = if (edge.loop) "Conexión de retorno" else "Conexión") {
+            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+                Text("$from → $to", color = hm.ink, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (edge.loop) Text("Vuelve a un punto anterior. Se dibuja punteada y no cuenta para plegar.", Modifier.padding(top = 4.dp), color = hm.muted, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(text, { text = it.take(200) }, Modifier.fillMaxWidth().padding(top = 16.dp), label = { Text("Texto en la flecha") },
+                    placeholder = { Text("Por ejemplo: «sí», «requiere», «después de»") }, singleLine = true)
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("Quitar conexión", { model.disconnect(edge); onDismiss() }, Modifier.weight(1f), color = hm.danger)
+                    PrimaryButton("Guardar", { model.setEdgeLabel(edge.id, text) }, Modifier.weight(1f))
                 }
             }
         }

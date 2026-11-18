@@ -131,7 +131,7 @@ class FlowLinksTest {
             db.execSQL("INSERT INTO flow_edges (id, documentId, fromId, toId, createdAt, updatedAt, deletedAt) VALUES ('e1', '11111111-1111-1111-1111-111111111111', 'n1', 'n2', 0, 0, NULL)")
             db.version = 3
         }
-        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_3_4).build()
+        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_3_4, LibraryDatabase.MIGRATION_4_5).build()
         repo = LibraryRepository(context, database)
         val doc = repo.dao.document("11111111-1111-1111-1111-111111111111")!!
         assertEquals(3, doc.revision); assertNull(doc.lastOpenedAt)
@@ -141,6 +141,34 @@ class FlowLinksTest {
         assertEquals(1, repo.dao.flowEdges(doc.id).size)
         val note = repo.createMarkdown(null, "Nueva")
         assertEquals(1, repo.linkFlowNode(doc.id, "n1", listOf(note.id), emptyList()))
+        database.close()
+    }
+
+    /** Una base v4 real migra a v5: las conexiones existentes quedan como árbol, sin texto. */
+    @Test fun migrationFromVersionFour() = runBlocking {
+        database.close()
+        val name = "migration-v4.db"
+        context.deleteDatabase(name)
+        val schema = JSONObject(File("schemas/com.hypermarker.storage.LibraryDatabase/4.json").readText()).getJSONObject("database")
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name).apply { parentFile!!.mkdirs() }, null).use { db ->
+            val entities = schema.getJSONArray("entities")
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i); val table = entity.getString("tableName")
+                db.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+                entity.optJSONArray("indices")?.let { list -> for (j in 0 until list.length()) db.execSQL(list.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", table)) }
+            }
+            val setup = schema.getJSONArray("setupQueries")
+            for (i in 0 until setup.length()) db.execSQL(setup.getString(i))
+            db.execSQL("INSERT INTO documents (id, folderId, title, type, entryPath, networkAllowed, revision, createdAt, updatedAt, lastOpenedAt) VALUES ('22222222-2222-2222-2222-222222222222', NULL, 'Flow v4', 'FLOW', NULL, 0, 2, 5, 6, NULL)")
+            for (n in listOf("a", "b")) db.execSQL("INSERT INTO flow_nodes (id, documentId, title, body, x, y, collapsed, createdAt, updatedAt, deletedAt, avatarPath, avatarLinkId, ringColor) VALUES ('$n', '22222222-2222-2222-2222-222222222222', '$n', '', 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL)")
+            db.execSQL("INSERT INTO flow_edges (id, documentId, fromId, toId, createdAt, updatedAt, deletedAt) VALUES ('e1', '22222222-2222-2222-2222-222222222222', 'a', 'b', 0, 0, NULL)")
+            db.version = 4
+        }
+        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_4_5).build()
+        repo = LibraryRepository(context, database)
+        val edge = repo.dao.flowEdges("22222222-2222-2222-2222-222222222222").single()
+        assertFalse(edge.loop); assertNull(edge.label)
+        assertTrue(repo.connectFlowNodes("22222222-2222-2222-2222-222222222222", "b", "a", "otra vez").loop)
         database.close()
     }
 

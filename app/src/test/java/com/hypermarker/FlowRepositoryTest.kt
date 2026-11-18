@@ -37,7 +37,16 @@ class FlowRepositoryTest {
         try { repo.createFlowNode(flow.id, Float.NaN, 0f, "x", ""); fail("Coordenada inválida permitida") } catch (_: IllegalArgumentException) {}
         repo.connectFlowNodes(flow.id, a.id, b.id)
         repo.connectFlowNodes(flow.id, b.id, c.id)
-        try { repo.connectFlowNodes(flow.id, c.id, a.id); fail("Ciclo permitido") } catch (_: IllegalArgumentException) {}
+        // c → a cerraría un ciclo: se guarda como retorno (sólo visual), con texto, sin tocar el árbol.
+        val back = repo.connectFlowNodes(flow.id, c.id, a.id, "  vuelve   a empezar ")
+        assertTrue(back.loop); assertEquals("vuelve a empezar", back.label)
+        assertFalse(repo.connectFlowNodes(flow.id, a.id, c.id).loop)
+        try { repo.connectFlowNodes(flow.id, c.id, a.id); fail("Retorno duplicado permitido") } catch (_: IllegalArgumentException) {}
+        try { repo.connectFlowNodes(flow.id, a.id, a.id); fail("Autoconexión permitida") } catch (_: IllegalArgumentException) {}
+        repo.labelFlowEdge(flow.id, back.id, " ")
+        assertNull(repo.dao.flowEdges(flow.id).first { it.id == back.id }.label)
+        try { repo.labelFlowEdge(flow.id, back.id, "x".repeat(201)); fail("Texto demasiado largo") } catch (_: IllegalArgumentException) {}
+        repo.deleteFlowEdge(flow.id, back.id); repo.deleteFlowEdge(flow.id, repo.dao.flowEdges(flow.id).first { it.fromId == a.id && it.toId == c.id }.id)
         try { repo.connectFlowNodes(flow.id, a.id, b.id); fail("Duplicado permitido") } catch (_: IllegalArgumentException) {}
         repo.updateFlowNode(flow.id, a.id, "Inicio", "Texto")
         repo.moveFlowNode(flow.id, a.id, -20f, 30f)
@@ -49,9 +58,9 @@ class FlowRepositoryTest {
         assertEquals(setOf(a.id, c.id), repo.dao.flowNodes(flow.id).map { it.id }.toSet())
         assertTrue(repo.dao.flowEdges(flow.id).isEmpty())
         // El tombstone sigue guardado para una sincronización futura.
-        database.query("SELECT COUNT(*) FROM flow_edges WHERE deletedAt IS NOT NULL", null).use { it.moveToFirst(); assertEquals(2, it.getInt(0)) }
-        // Al borrar b ya no hay ruta c → a, así que la conexión antes cíclica ahora es válida.
-        repo.connectFlowNodes(flow.id, c.id, a.id)
+        database.query("SELECT COUNT(*) FROM flow_edges WHERE deletedAt IS NOT NULL", null).use { it.moveToFirst(); assertEquals(4, it.getInt(0)) }
+        // Al borrar b ya no hay ruta a → c, así que c → a vuelve a ser una conexión normal del árbol.
+        assertFalse(repo.connectFlowNodes(flow.id, c.id, a.id).loop)
         Unit
     }
 
@@ -93,7 +102,7 @@ class FlowRepositoryTest {
             db.execSQL("INSERT INTO documents (id, folderId, title, type, entryPath, networkAllowed, revision, createdAt, updatedAt) VALUES ('11111111-1111-1111-1111-111111111111', NULL, 'Antigua', 'MARKDOWN', NULL, 0, 1, 0, 0)")
             db.version = 1
         }
-        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4).build()
+        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4, LibraryDatabase.MIGRATION_4_5).build()
         repo = LibraryRepository(context, database)
         assertEquals("Antigua", repo.dao.documents().single().title)
         val flow = repo.createFlow(null, "Después de migrar")
@@ -121,7 +130,7 @@ class FlowRepositoryTest {
             db.execSQL("INSERT INTO annotations (id, documentId, kind, pageKey, payload, schemaVersion) VALUES ('a1', '11111111-1111-1111-1111-111111111111', 'PIN', '/', '{}', 1)")
             db.version = 2
         }
-        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4).build()
+        database = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4, LibraryDatabase.MIGRATION_4_5).build()
         repo = LibraryRepository(context, database)
         assertEquals("Punto", repo.dao.flowNodes("11111111-1111-1111-1111-111111111111").single().title)
         assertEquals(1, repo.dao.annotations("11111111-1111-1111-1111-111111111111").size)

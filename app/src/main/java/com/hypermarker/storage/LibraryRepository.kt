@@ -27,7 +27,7 @@ const val MERMAID_TEMPLATE = "flowchart TB\n    idea[\"Idea\"] --> plan[\"Plan\"
 
 class LibraryRepository(val context: Context, database: LibraryDatabase? = null) {
     val database = database ?: Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
-        .addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4).build()
+        .addMigrations(LibraryDatabase.MIGRATION_1_2, LibraryDatabase.MIGRATION_2_3, LibraryDatabase.MIGRATION_3_4, LibraryDatabase.MIGRATION_4_5).build()
     val dao = this.database.dao()
     private val mutex = Mutex()
     private var recovered = false
@@ -196,7 +196,7 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
         require(dao.flowEdges(document.id).size + plan.edges.size <= 20_000) { "El Flow admite hasta 20000 conexiones" }
         val now = System.currentTimeMillis()
         val nodes = plan.nodes.map { FlowNode(id(), document.id, it.title.trim(), it.body, coordinate(it.x), coordinate(it.y), createdAt = now, updatedAt = now, ringColor = it.ring) }
-        val edges = plan.edges.map { (from, to) -> FlowEdge(id(), document.id, nodes[from].id, nodes[to].id, createdAt = now, updatedAt = now) }
+        val edges = plan.edges.map { e -> FlowEdge(id(), document.id, nodes[e.from].id, nodes[e.to].id, createdAt = now, updatedAt = now, label = e.label, loop = e.loop) }
         try {
             if (target == null) require(directory(document.id).mkdirs()) { "No se pudo crear el documento" }
             database.withTransaction {
@@ -377,14 +377,25 @@ class LibraryRepository(val context: Context, database: LibraryDatabase? = null)
     suspend fun setFlowCollapsed(document: String, node: String, collapsed: Boolean) = write {
         dao.put(flowNode(document, node).copy(collapsed = collapsed, updatedAt = System.currentTimeMillis()))
     }
-    /** Conecta `from` (padre) con `to`. Rechaza autoconexiones, duplicados y ciclos. */
-    suspend fun connectFlowNodes(document: String, from: String, to: String): FlowEdge = write {
+    /**
+     * Conecta `from` (padre) con `to`. Rechaza autoconexiones y duplicados. Si la conexión cerraría un ciclo en el
+     * árbol, se guarda como retorno (`loop`): sólo visual, fuera de plegado y raíces.
+     */
+    suspend fun connectFlowNodes(document: String, from: String, to: String, label: String? = null): FlowEdge = write {
         flowNode(document, from); flowNode(document, to)
+        require(from != to) { "Un punto no puede conectarse consigo mismo" }
         val edges = dao.flowEdges(document)
         require(edges.none { it.fromId == from && it.toId == to }) { "Esos puntos ya están conectados" }
-        require(!FlowGraph.wouldCreateCycle(edges.map { it.fromId to it.toId }, from, to)) { "La conexión crearía un ciclo" }
         require(edges.size < 20_000) { "El Flow admite hasta 20000 conexiones" }
-        FlowEdge(id(), document, from, to).also { dao.put(it) }
+        val loop = FlowGraph.wouldCreateCycle(edges.filter { !it.loop }.map { it.fromId to it.toId }, from, to)
+        FlowEdge(id(), document, from, to, label = edgeLabel(label), loop = loop).also { dao.put(it) }
+    }
+    private fun edgeLabel(value: String?) = value?.trim()?.replace(Regex("\\s+"), " ")?.takeIf { it.isNotEmpty() }
+        ?.also { require(it.length <= 200) { "El texto de la flecha admite 200 caracteres" } }
+    /** Texto en medio de la flecha; vacío lo quita. */
+    suspend fun labelFlowEdge(document: String, edge: String, label: String?) = write {
+        val value = requireNotNull(dao.flowEdges(document).firstOrNull { it.id == edge }) { "La conexión ya no existe" }
+        dao.put(value.copy(label = edgeLabel(label), updatedAt = System.currentTimeMillis()))
     }
     suspend fun deleteFlowEdge(document: String, edge: String) = write {
         val value = requireNotNull(dao.flowEdges(document).firstOrNull { it.id == edge }) { "La conexión ya no existe" }

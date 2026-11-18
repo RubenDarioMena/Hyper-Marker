@@ -32,7 +32,7 @@ class FlowMermaidTest {
         val graph = MermaidFlow.parse(javaClass.getResource("/mermaid/generador-gravitacional.graph.json")!!.readText())
         val plan = MermaidFlow.plan(graph)
         val nodes = plan.nodes.mapIndexed { i, p -> node("p$i", p.title, p.body, p.x, p.y, p.ring) }
-        val code = FlowMermaid.generate("Superarma", nodes, plan.edges.map { (a, b) -> edge("p$a", "p$b") })
+        val code = FlowMermaid.generate("Superarma", nodes, plan.edges.map { e -> edge("p${e.from}", "p${e.to}").copy(label = e.label, loop = e.loop) })
         assertEquals(21, Regex("""^\s+n\d+\["""", RegexOption.MULTILINE).findAll(code).count())
         assertEquals(25, Regex("""^\s+n\d+ --> n\d+$""", RegexOption.MULTILINE).findAll(code).count())
         assertTrue(code.contains("subgraph g1[\"RAMA A · MATERIA EXTREMA\"]") || code.contains("subgraph g1[\"RAMA B · FÍSICA DE PARTÍCULAS\"]"))
@@ -40,6 +40,13 @@ class FlowMermaidTest {
         assertFalse(code.contains("Grupo:"))
         assertTrue(code.contains("[\"Transmutación nuclear<br/>Producir elementos escasos\"]"))
         assertFalse("los nodos agrupados no llevan estilo propio", code.contains("style"))
+    }
+
+    @Test fun arrowTextAndReturnConnectionsAreExported() {
+        val nodes = listOf(node("a", "Idea", "", 0f, 0f), node("b", "Prueba", "", 0f, 100f))
+        val code = FlowMermaid.generate("x", nodes, listOf(edge("a", "b").copy(label = "si funciona | sigue"), edge("b", "a").copy(label = "ajustar", loop = true)))
+        assertTrue(code.contains("    n1 -->|si funciona #124; sigue| n2\n"))
+        assertTrue(code.contains("    n2 -.->|ajustar| n1\n"))
     }
 
     @Test fun annotationsThatDoNotMatchStayAsTextAndLimitsApply() {

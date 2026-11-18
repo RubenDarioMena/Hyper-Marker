@@ -90,7 +90,7 @@ Funcionalidad fuera de V1 ([propuesta](proposals/flow-dots.md)). Estos casos no 
 | FLOW-01 | Crear un Flow en la biblioteca; renombrar, mover, duplicar y borrar. | Tipo `FLOW` con icono propio; la copia tiene identidades nuevas e independientes; borrar elimina puntos y conexiones. |
 | FLOW-02 | Tocar el vacío, cancelar; tocar de nuevo y guardar con título. | Cancelar o guardar vacío no crea nada; guardar crea el punto en esa posición y persiste tras cerrar/reabrir. |
 | FLOW-03 | Mantener sobre un punto y deslizar hasta otro; soltar. | Háptica al activarse, línea elástica, destino resaltado, conexión padre → hijo creada. |
-| FLOW-04 | Intentar conectar hijo → antepasado; soltar en vacío. | Destino en rojo y aviso de ciclo sin crear nada; en vacío se cancela. |
+| FLOW-04 | Conectar hijo → antepasado; soltar en vacío. | Desde 2026-11-18: destino en lila y se crea un **retorno** punteado que no cambia el plegado (antes: rechazo en rojo); en vacío se cancela. Duplicados y autoconexión siguen rechazados (JVM `FlowRepositoryTest`). |
 | FLOW-05 | Mantener y soltar sin mover sobre un padre; repetir. | Oculta los descendientes sin otra ruta visible y muestra «+N»; repetir los restaura. |
 | FLOW-06 | Reordenar: arrastrar un punto, Listo, reabrir. | Posición nueva persistida; crear/conectar/plegar suspendidos mientras dura. |
 | FLOW-07 | Desplazar con un dedo, zoom con dos, Encuadrar. | El zoom mantiene el punto bajo los dedos; Encuadrar muestra todos los puntos visibles. |
@@ -206,3 +206,14 @@ Función adicional ([propuesta](proposals/mermaid.md)). «JVM» = `MermaidFlowTe
 | MMD-12 | «Abrir como diagrama» en la nota; Atrás | Documento «Diagrama · nota» con el código del bloque; la nota queda guardada y Atrás vuelve a ella. Botón ausente en GitHub de solo lectura (web). |
 | MMD-13 | Flow → «Crear diagrama Mermaid»; exportar SVG/PNG | Documento Mermaid copiado; grupos, etiquetas y ciclos anotados restaurados (JVM `FlowMermaidTest`, web `the Flow → Mermaid export sample…`); el Flow no cambia. |
 | MMD-14 | Muestras del propietario `fixtures/mermaid/muestra-*.mmd` | Igual que `docs/design/mermaid/referencia-*.svg`: formas, subgrafos anidados, estados centrados con etiquetas grises, mapa mental (web `the owner reference samples…`). |
+| MMD-15 | Convertir `muestra-3-estados.mmd` y `muestra-4-mapa-mental.mmd` (Flow nuevo y Añadir a Flow) | Estados: «● Inicio»/«◉ Fin», textos «energía»/«apagar» en las flechas y `Activo → Inactivo` como retorno; mapa mental: 7 puntos, 6 conexiones y color por rama (JVM `ownerStateAndMindMapSamplesConvert`, web `state diagrams and mind maps…`, captura `16-flow-desde-mapa-mental-y-estados.png`). |
+
+### Flow: texto en flechas y retornos (Room v5)
+
+| ID | Escenario | Resultado esperado |
+|---|---|---|
+| FLOW-16 | Tocar el centro de una flecha; escribir un texto; Guardar; vaciarlo | Hoja «Conexión» con origen → destino; el texto aparece en una píldora sobre la flecha y desaparece al vaciarlo; ≤ 200 caracteres (JVM). Táctil en dispositivo. |
+| FLOW-17 | «Conexiones» de un punto | Cada fila dice Hijo/Padre/Retorno y el texto; tocarla abre su edición; «Quitar» la elimina. |
+| FLOW-18 | Mantener un hijo y soltar sobre su antepasado; plegar el antepasado | Retorno punteado en lila; plegar oculta lo mismo que antes y el retorno se oculta con sus puntos; «+N» no cuenta retornos. |
+| FLOW-19 | Base v4 real → v5 | Conexiones existentes como árbol sin texto; ninguna fila cambia (JVM `migrationFromVersionFour`). Respaldar S24/Tab antes de instalar. |
+| FLOW-20 | Flow con textos y retornos → «Crear diagrama Mermaid» | `-->|texto|` y `-.->` para retornos (JVM `arrowTextAndReturnConnectionsAreExported`). |

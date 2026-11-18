@@ -113,6 +113,41 @@ class RedesignScreenshotTest {
         save("09-flow-lienzo")
     }
 
+    /** Texto en las flechas y una conexión de retorno (bucle visual) hacia un punto anterior. */
+    @Test fun flowArrowTextAndReturns() {
+        val flow = runBlocking {
+            val flow = repo.createFlow(null, "Ciclo de una idea")
+            val idea = repo.createFlowNode(flow.id, 0f, 0f, "Idea", "")
+            val proto = repo.createFlowNode(flow.id, 0f, 190f, "Prototipo", "")
+            val test = repo.createFlowNode(flow.id, 0f, 380f, "Prueba", "")
+            val ship = repo.createFlowNode(flow.id, 150f, 560f, "Lanzar", "")
+            val notes = repo.createFlowNode(flow.id, -150f, 560f, "Aprendizajes", "")
+            repo.connectFlowNodes(flow.id, idea.id, proto.id, "construir")
+            repo.connectFlowNodes(flow.id, proto.id, test.id, "probar")
+            repo.connectFlowNodes(flow.id, test.id, ship.id, "si funciona")
+            repo.connectFlowNodes(flow.id, test.id, notes.id)
+            check(repo.connectFlowNodes(flow.id, test.id, idea.id, "ajustar").loop)
+            check(repo.connectFlowNodes(flow.id, notes.id, proto.id, "mejora").loop)
+            flow.id
+        }
+        flowScreen(flow)
+        compose.mainClock.advanceTimeBy(1000)
+        save("15-flow-flechas-y-retornos")
+    }
+
+    /** Las muestras de estados y mapa mental del propietario copiadas a un mismo Flow (ver MermaidFlowTest). */
+    @Test fun flowFromStateAndMindMap() {
+        val flow = runBlocking {
+            fun graph(name: String) = com.hypermarker.mermaid.MermaidFlow.parse(javaClass.getResource("/mermaid/$name.graph.json")!!.readText())
+            val (flow, _) = repo.copyMermaidToFlow(graph("muestra-4-mapa-mental"), null, null, "Mermaid en Flow", null)
+            repo.copyMermaidToFlow(graph("muestra-3-estados"), flow.id, null, "Estados", "Estados" to "Copia")
+            flow.id
+        }
+        flowScreen(flow)
+        compose.mainClock.advanceTimeBy(1000)
+        save("16-flow-desde-mapa-mental-y-estados")
+    }
+
     @Test fun flowOpenDotAndRadial() {
         val (flow, ids) = seedFlow()
         flowScreen(flow)

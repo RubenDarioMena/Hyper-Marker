@@ -1,0 +1,116 @@
+{
+ "type": "mindmap",
+ "supported": true,
+ "direction": "TB",
+ "nodes": [
+  {
+   "id": "0",
+   "label": "Superarma",
+   "shape": "mindmapCircle",
+   "x": 98.66865408871915,
+   "y": 245.35606288486522,
+   "width": 108.39653272816764,
+   "height": 108.39653272816764,
+   "color": "#f4a8ff"
+  },
+  {
+   "id": "1",
+   "label": "Materia extrema",
+   "shape": "rounded",
+   "x": 128.50165680710384,
+   "y": 375.28799598512245,
+   "width": 146.77687365517497,
+   "height": 46.99859395520969,
+   "color": "#46ecd5"
+  },
+  {
+   "id": "2",
+   "label": "Transmutación",
+   "shape": "rounded",
+   "x": 320.80914668995604,
+   "y": 334.1362340223556,
+   "width": 132.90228011111034,
+   "height": 46.99859395520969,
+   "color": "#46ecd5"
+  },
+  {
+   "id": "3",
+   "label": "Ultradensos",
+   "shape": "rounded",
+   "x": 144.6588164040937,
+   "y": 475.27292596682895,
+   "width": 113.59035986187534,
+   "height": 46.99859395520969,
+   "color": "#46ecd5"
+  },
+  {
+   "id": "4",
+   "label": "Partículas",
+   "shape": "rounded",
+   "x": 163.83373888564364,
+   "y": 120.12388970042213,
+   "width": 100.70013055630552,
+   "height": 46.99858559557046,
+   "color": "#ffb86a"
+  },
+  {
+   "id": "5",
+   "label": "Acelerador",
+   "shape": "rounded",
+   "x": 67.66803548030045,
+   "y": 38.49900128749978,
+   "width": 105.3249839248081,
+   "height": 46.998602314848924,
+   "color": "#ffb86a"
+  },
+  {
+   "id": "6",
+   "label": "Microagujeros",
+   "shape": "rounded",
+   "x": 284.7847778079439,
+   "y": 44.84401135042705,
+   "width": 127.99619175966531,
+   "height": 46.998598135029305,
+   "color": "#ffb86a"
+  }
+ ],
+ "edges": [
+  {
+   "from": "0",
+   "to": "1",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "1",
+   "to": "2",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "1",
+   "to": "3",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "0",
+   "to": "4",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "4",
+   "to": "5",
+   "label": "",
+   "stroke": "normal"
+  },
+  {
+   "from": "4",
+   "to": "6",
+   "label": "",
+   "stroke": "normal"
+  }
+ ],
+ "groups": []
+}
